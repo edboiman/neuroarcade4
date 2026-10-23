@@ -18,7 +18,7 @@ const games=[['blockfit','Block Fit'],['dungeon','Deep Delve'],['survivor','Holi
 for(const [id,name]of games){
  try{
  await page.getByRole('button',{name:'Play '+name,exact:true}).click();
- await page.locator('.modal-actions .primary').click();
+ if(await page.locator('.modal').count())throw Error('Unexpected game-entry confirmation');
  await page.locator('.game-overlay').waitFor();
  await page.locator('.game-overlay .go-actions .primary').click();
  if(id==='cafe')await page.getByRole('button',{name:'I already know these',exact:true}).click();

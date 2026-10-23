@@ -1,3 +1,9 @@
+# 2.0.1: entry and installed-update fix
+
+Reproduced an upgrade from the original installed five-game release. The old worker could remain active, serving the old carousel and blocking weekly welcome dialog while the replacement waited. A complete new release now activates automatically and refreshes legacy shells once. Newer clients preserve active play and finish updating after the game is saved and left. Cache names are scoped to the application path, so separate apps on the same host do not clear each other’s caches.
+
+Removed the extra game-launch confirmation and the home-page check-in link. The initial view opens the game library, and navigation explicitly shows **All games (10)**. Existing per-game setup, language and difficulty controls remain available. Added a regression browser test for the actual legacy-to-current upgrade and progress preservation.
+
 # Neuro Arcade 2.0 changes
 
 ## Presentation and navigation

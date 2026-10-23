@@ -6,6 +6,7 @@ import { rotation, weekStart, weekComplete, shiftWeek, streak, GAME_IDS, MIN_SES
 import * as audio from './audio.js';
 import { fpsFor, dprFor } from './loop.js';
 import { goalProgress } from './session.js';
+import { VERSION } from './version.js';
 
 const app = document.getElementById('app');
 let current = null; // { destroy, pause?, onBack? }
@@ -13,6 +14,9 @@ let screen = 'hub';
 let currentParams = null;
 let swReg = null;
 let updateWaiting = false;
+let activePlay = false;
+let reloadingForUpdate = false;
+let pendingActivatedVersion = null;
 let gameRun = 0; // increments for each game mount so stale async work can be ignored
 
 const ctxBase = {
@@ -38,6 +42,7 @@ async function render(name, params) {
     }
   }
   current = null;
+  if (name !== 'game' && pendingActivatedVersion && !reloadingForUpdate) { reloadingForUpdate = true; location.reload(); return; }
   const renderRun = ++gameRun;
   clear(app);
   screen = name;
@@ -113,6 +118,7 @@ async function enterGame(id, params = {}) {
 
   let activeMs = 0, activeAt = null;
   const playing = value => {
+    activePlay = !!value;
     if (activeAt !== null) activeMs += performance.now() - activeAt;
     activeAt = value && !document.hidden ? performance.now() : null;
   };
@@ -151,6 +157,7 @@ async function enterGame(id, params = {}) {
     destroy() {
       document.removeEventListener('visibilitychange', onVis);
       if (api && api.destroy) api.destroy();
+      activePlay = false;
     },
     onBack: () => (api && api.onBack ? api.onBack() : false),
   };
@@ -210,11 +217,26 @@ function showResults(g, result, durationSec) {
   app.append(panel);
 }
 
+// Older releases had no activation handler and could stay on the five-game shell.
+// Acknowledge updates here so the worker does not navigate an active new-version run.
+if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', event => {
+  if (event.data?.type !== 'ARCADE_ACTIVATED') return;
+  event.ports[0]?.postMessage({ version: VERSION, activePlay });
+  if (event.data.version === VERSION) return;
+  updateWaiting = true;
+  pendingActivatedVersion = event.data.version;
+  if (activePlay) { toast('Update downloaded. Your game is safe; restart from Settings when ready.', 4500); return; }
+  if (reloadingForUpdate) return;
+  reloadingForUpdate = true;
+  if (current?.destroy) current.destroy();
+  location.reload();
+});
+
 // ---------- service worker (offline) ----------
 async function registerSW() {
   if (!('serviceWorker' in navigator)) return;
   try {
-    swReg = await navigator.serviceWorker.register('sw.js');
+    swReg = await navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' });
     const watch = (reg) => {
       if (reg.waiting && navigator.serviceWorker.controller) updateWaiting = true;
       reg.addEventListener('updatefound', () => {
@@ -229,6 +251,7 @@ async function registerSW() {
       });
     };
     watch(swReg);
+    swReg.update().catch(() => {});
   } catch (err) {
     console.warn('Offline support unavailable', err);
   }

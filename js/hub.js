@@ -1,4 +1,4 @@
-import { h, icon, fill, modal } from './ui.js';
+import { h, icon, fill } from './ui.js';
 import { GAMES } from './registry.js';
 import { store } from './store.js';
 import { gameArt } from './art.js';
@@ -6,22 +6,19 @@ import { miniature, decorationArt } from './miniatures.js';
 import { dailySeed, goalProgress } from './session.js';
 
 export function mountHub(root,ctx){
- let view=['arcade','library','collection'][store.pref('arcade','view',0)]||'arcade',filter='All',mood='all';
+ let view=['arcade','library','collection'][store.pref('arcade','view',1)]||'arcade',filter='All',mood='all';
  const sessions=store.sessions(),goal=goalProgress(store),total=sessions.length;
  const selected=store.pref('arcade','decor',0),style=store.pref('arcade','roomstyle',0);
  const el=h('div',{class:`screen arcade roomstyle-${style}`});
  const content=h('main',{class:'arcade-content',id:'main-content'});
  const navs=[];
  const mark=h('span',{class:'brand-mark'},icon('play',20));
- const header=h('header',{class:'arcade-header'},h('a',{class:'skip-link',href:'#main-content'},'Skip to games'),h('button',{class:'brand',type:'button',onclick:()=>setView('arcade')},mark,h('span',null,h('b',null,'NEURO ARCADE'),h('small',null,'A place to play.'))),h('nav',{'aria-label':'Main navigation'},[['arcade','The arcade'],['library','All games'],['collection','Your room']].map(([id,label])=>{const b=h('button',{class:'nav-link',type:'button',onclick:()=>setView(id)},label);navs.push([id,b]);return b;})),h('div',{class:'header-tools'},h('button',{class:'icon-btn',type:'button','aria-label':'Progress',onclick:()=>ctx.nav.go('stats')},icon('stats',20)),h('button',{class:'icon-btn',type:'button','aria-label':'Settings',onclick:()=>ctx.nav.go('settings')},icon('sliders',20))));
+ const header=h('header',{class:'arcade-header'},h('a',{class:'skip-link',href:'#main-content'},'Skip to games'),h('button',{class:'brand',type:'button',onclick:()=>setView('arcade')},mark,h('span',null,h('b',null,'NEURO ARCADE'),h('small',null,'A place to play.'))),h('nav',{'aria-label':'Main navigation'},[['arcade','The arcade'],['library',`All games (${GAMES.length})`],['collection','Your room']].map(([id,label])=>{const b=h('button',{class:'nav-link',type:'button',onclick:()=>setView(id)},label);navs.push([id,b]);return b;})),h('div',{class:'header-tools'},h('button',{class:'icon-btn',type:'button','aria-label':'Progress',onclick:()=>ctx.nav.go('stats')},icon('stats',20)),h('button',{class:'icon-btn',type:'button','aria-label':'Settings',onclick:()=>ctx.nav.go('settings')},icon('sliders',20))));
  el.append(header,content);root.append(el);
  function setView(v){view=v;store.setPref('arcade','view',['arcade','library','collection'].indexOf(v));render();content.scrollTop=0;}
- async function launch(g,mode='standard',resume=false){
-  if(resume)return ctx.nav.go('game',{id:g.id,resume:true,mode:store.loadGame(g.id)?.meta?.mode||'standard'});
-  const notes=h('div',{class:'launch-info'},h('p',null,g.blurb),h('p',{class:'fine'},`${g.duration} · ${g.category} · Saved automatically on this device`));
-  const actions=g.id==='blockfit'?[{label:'Play Block Fit',value:'standard',kind:'primary'}]:[{label:'Take it easy',value:'practice'},{label:mode==='daily'?'Play daily challenge':'Let’s play',value:mode,kind:'primary'}];
-  const chosen=await modal({title:g.name,body:notes,actions});
-  if(chosen)ctx.nav.go('game',{id:g.id,mode:chosen,seed:chosen==='daily'?dailySeed(g.id):undefined});
+ function launch(g,mode='standard',resume=false){
+  const saved=resume?store.loadGame(g.id):null;
+  ctx.nav.go('game',{id:g.id,resume,mode:saved?.meta?.mode||mode,seed:mode==='daily'?dailySeed(g.id):undefined});
  }
  function card(g){
   const history=sessions.filter(s=>s.g===g.id),save=store.loadGame(g.id),isNew=['signal','workshop','casebook','echo','logistics'].includes(g.id);
@@ -40,7 +37,7 @@ export function mountHub(root,ctx){
   const progress=h('div',{class:'week-goal'},h('div',null,h('span',{class:'eyebrow'},'YOUR WEEK, YOUR PACE'),h('h3',null,goal.complete?'Your weekly goal is complete':`${Math.min(goal.count,goal.goal)} of ${goal.goal} sessions`),h('p',null,'Any games you enjoy. Change your goal in Settings.')),h('div',{class:'goal-dots','aria-label':`${goal.count} of ${goal.goal} sessions`},Array.from({length:goal.goal},(_,i)=>h('i',{class:i<goal.count?'done':''}))),h('button',{class:'text-btn',type:'button',onclick:()=>ctx.nav.go('stats')},'View progress →'));
   const dailyCard=h('div',{class:'daily-card'},h('span',{class:'eyebrow'},'A FRESH CHALLENGE'),h('h3',null,daily.name),h('p',null,'The same starting challenge all day. Beat your own score, at your own pace.'),h('button',{class:'text-btn',type:'button',onclick:()=>launch(daily,'daily')},'Play today’s challenge →'));
   const moodPicker=h('div',{class:'mood-picker',role:'group','aria-label':'Choose your session'},[['all','Anything goes'],['short','I have five minutes'],['calm','Something relaxed'],['adventure','An adventure']].map(([id,label])=>h('button',{class:'filter-chip'+(mood===id?' active':''),type:'button','aria-pressed':String(mood===id),onclick:()=>{mood=id;render();}},label)));
-  fill(content,view==='arcade'?hero:h('div',{class:'library-title'},h('span',{class:'eyebrow'},'THE COLLECTION'),h('h1',null,'Find your next favorite.'),h('p',null,'Ten games. No accounts, no ads. Everything works offline after installation.')),view==='arcade'?h('div',{class:'arcade-dashboard'},progress,dailyCard):null,saved.length&&view==='arcade'?section('Pick up where you left off','Your saved games are waiting.',saved):null,h('section',{class:'arcade-section'},h('div',{class:'section-heading'},h('div',null,h('h2',null,view==='arcade'?'What are you in the mood for?':'All games'),h('p',null,'Follow your curiosity. Everything is open from the start.'))),moodPicker,filters,h('div',{class:'game-grid'},filtered.map(card)),!filtered.length?h('p',{class:'empty'},'Try another category or session length.'):null),h('footer',{class:'arcade-footer'},h('span',null,'Made for small moments of play.'),h('button',{class:'text-btn',type:'button',onclick:()=>ctx.nav.go('checkin')},'Optional check-in →')));
+  fill(content,view==='arcade'?hero:h('div',{class:'library-title'},h('span',{class:'eyebrow'},'THE COLLECTION'),h('h1',null,'Find your next favorite.'),h('p',null,'Ten games. No accounts, no ads. Everything works offline after installation.')),view==='arcade'?h('div',{class:'arcade-dashboard'},progress,dailyCard):null,saved.length&&view==='arcade'?section('Pick up where you left off','Your saved games are waiting.',saved):null,h('section',{class:'arcade-section'},h('div',{class:'section-heading'},h('div',null,h('h2',null,view==='arcade'?'What are you in the mood for?':'All games'),h('p',null,'Follow your curiosity. Everything is open from the start.'))),moodPicker,filters,h('div',{class:'game-grid'},filtered.map(card)),!filtered.length?h('p',{class:'empty'},'Try another category or session length.'):null),h('footer',{class:'arcade-footer'},h('span',null,`${GAMES.length} games · Neuro Arcade 2.0.1`)));
  }
  function renderCollection(){
   const decor=[['A quiet corner','Your room starts here.',0],['A little greenery','Plants beside the cabinets.',3],['Warm evenings','A brass lamp for the room.',8],['The listening corner','A collection of favorite records.',15],['Under the stars','A tiny constellation above the arcade.',30]];

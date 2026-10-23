@@ -1,6 +1,6 @@
 {
   "name": "neuro-arcade",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "private": true,
   "type": "module",
   "description": "Offline-first brain-exercise games. No dependencies, no network access.",

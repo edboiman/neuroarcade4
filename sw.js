@@ -1,8 +1,9 @@
 // Offline cache. All files are stored at install time and served cache-first.
 // This worker never contacts any server except to download this app's own files once per update,
 // and it ignores every cross-origin request.
-const VERSION = 'a2262f93e6';
-const PREFIX = 'neuro-arcade-';
+const VERSION = 'a66edab2e0';
+const LEGACY_PREFIX = 'neuro-arcade-';
+const PREFIX = 'neuro-arcade:' + new URL(self.registration.scope).pathname + ':';
 const CACHE = PREFIX + VERSION;
 const PRECACHE = [
   /*PRECACHE_START*/
@@ -74,20 +75,51 @@ const PRECACHE = [
 ];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(PRECACHE.map((u) => new Request(u, { cache: 'reload' })))),
-  );
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE);
+    await cache.addAll(PRECACHE.map(u => new Request(u, { cache: 'reload' })));
+    // Switch only after every release file has installed successfully.
+    await self.skipWaiting();
+  })());
 });
 
+async function belongsToThisApp(key) {
+  if (key.startsWith(PREFIX)) return true;
+  if (!key.startsWith(LEGACY_PREFIX)) return false;
+  const cache = await caches.open(key);
+  return !!(await cache.match(self.registration.scope));
+}
+
+async function refreshOldShell(client) {
+  if (!client.url.startsWith(self.registration.scope)) return;
+  // New clients acknowledge and preserve an active game. Legacy clients cannot
+  // acknowledge, so navigate them to the fully installed release once.
+  const acknowledged = await new Promise(resolve => {
+    const channel = new MessageChannel();
+    const timer = setTimeout(() => { channel.port1.close(); resolve(false); }, 700);
+    channel.port1.onmessage = () => { clearTimeout(timer); channel.port1.close(); resolve(true); };
+    try { client.postMessage({ type: 'ARCADE_ACTIVATED', version: VERSION }, [channel.port2]); }
+    catch { clearTimeout(timer); channel.port1.close(); resolve(false); }
+  });
+  if (!acknowledged) {
+    // Do not await navigation inside activate: its fetch waits for activation.
+    client.navigate(client.url).catch(() => {});
+  }
+}
+
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    (async () => {
-      for (const key of await caches.keys()) {
-        if (key.startsWith(PREFIX) && key !== CACHE) await caches.delete(key);
-      }
-      await self.clients.claim();
-    })(),
-  );
+  event.waitUntil((async () => {
+    const obsolete = [];
+    for (const key of await caches.keys()) {
+      if (key !== CACHE && await belongsToThisApp(key)) obsolete.push(key);
+    }
+    await self.clients.claim();
+    if (obsolete.length) {
+      const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      await Promise.all(windows.map(refreshOldShell));
+      for (const key of obsolete) await caches.delete(key);
+    }
+  })());
 });
 
 self.addEventListener('message', (event) => {

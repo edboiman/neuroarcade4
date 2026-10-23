@@ -11,6 +11,11 @@ for (const f of files) {
   hash.update(f);
   hash.update(readFileSync(join(root, f)));
 }
+// Include worker behavior without its generated stamp or file list (no circular hash).
+const workerLogic = readFileSync(join(root, 'sw.js'), 'utf8')
+  .replace(/const VERSION = '[^']*';/, "const VERSION = 'BUILD';")
+  .replace(/\/\*PRECACHE_START\*\/[\s\S]*?\/\*PRECACHE_END\*\//, 'PRECACHE');
+hash.update(workerLogic);
 const version = hash.digest('hex').slice(0, 10);
 
 // version.js is excluded from the content hash to avoid a circular hash, but must be cached.

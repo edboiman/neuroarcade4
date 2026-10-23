@@ -34,3 +34,5 @@ Offline-first PWA, vanilla ES modules, static hosting including GitHub Pages sub
 - Only `store.js` may access localStorage. All DOM is created with `h()` / `s()`; no dynamic HTML, eval, remote scripts, fonts, images, or APIs.
 - `version.js` is outside the content hash but inside precaching. Keep audit/build agreement.
 - Documentation and tools are excluded from runtime precaching. Do not add generated test screenshots to the app tree.
+
+Installed updates: `sw.js` waits for a complete precache before activation. Legacy shells without an activation acknowledgement refresh once. Updated clients acknowledge the message and preserve active gameplay. Never await `WindowClient.navigate()` inside activation: navigation fetches wait for activation to complete. Worker behavior is included in the build hash after stripping generated version/list fields.

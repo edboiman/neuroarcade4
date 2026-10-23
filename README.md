@@ -1,4 +1,4 @@
-# Neuro Arcade 2
+# Neuro Arcade 2.0.1
 
 Ten playable games in a responsive, installable, offline-first arcade. No account, ads, trackers, production dependencies, or remote services.
 
@@ -10,7 +10,7 @@ Ten playable games in a responsive, installable, offline-first arcade. No accoun
 4. Open your Pages address. On Android, use the browser's **Install app / Add to Home screen** option.
 5. Allow the initial installation to complete. Settings will show **Ready to play offline**. Test by closing the app, switching to airplane mode, and reopening it.
 
-If replacing the previous version, keep the same Pages address so your browser retains its progress. Export a backup from Settings before replacing files. When an installed app reports an update, restart it from Settings. Do not erase your browser data to update.
+If replacing the previous version, keep the same Pages address so your browser retains its progress. Export a backup from Settings before replacing files. This release repairs upgrades from the original five-game installation. After uploading all files, reopen the installed app while online; it installs the complete update and refreshes the older screen. Check for **All games (10)**. An update received during active play completes after you save and leave the game. Your saved progress is retained.
 
 ## The games
 
@@ -65,3 +65,5 @@ After changing application files, run `npm run build` and commit the resulting `
 An optional Playwright smoke test is included in `tools/browser-smoke.cjs`. Install Playwright in a development environment, then run it with a supported Chromium executable. It checks all ten game launch/save/resume paths, mobile settings and Progress, offline reload, and GitHub Pages-style subpath hosting. No browser/test dependencies are included in the shipped app.
 
 See `RELEASE_NOTES.md`, `CLAUDE.md`, `SECURITY.md`, and `ASSET_NOTES.md` for implementation details.
+
+Upgrade regression test: set `LEGACY_APP_DIR` to an extracted original release, then run `node tools/browser-upgrade.cjs` with Playwright and Chromium installed. It reproduces the old five-game weekly gate, installs this release, verifies all ten games and preserved scores, and checks that a later update preserves active play and checkpoints.
