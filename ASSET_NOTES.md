@@ -12,4 +12,12 @@ Production prompt set:
 
 Final local assets: `assets/arcade-room.webp`, `assets/dungeon.webp`, `assets/cafe.webp`, `assets/forest.webp`, `assets/city.webp`.
 
-Gameplay graphics, new-room previews, decorations, character drawings, and vocabulary icons are native Canvas/SVG assets. Poppins remains bundled under its included SIL Open Font License in `fonts/OFL.txt`.
+Marbleworks and Bannerfall gameplay, room previews, decorations, and vocabulary icons are native Canvas/SVG assets. Horde uses the local painted sprite atlas described below, with native effects and UI. Poppins remains bundled under its included SIL Open Font License in `fonts/OFL.txt`.
+
+
+## Horde 2.1 production art
+
+- `assets/horde-actors.webp`: an original four-by-four transparent sprite atlas. Four walk/wing frames each for a hooded teal ranger with bow and copper lantern, a burgundy skeletal soldier, a violet spectral bat, and a moss-armored ogre. Generated using the built-in image tool, then cell-cropped, packed into a 768-pixel atlas, and compressed as WebP. Sprites animate inside the game; they are not background illustrations.
+- `assets/horde-ground.webp`: a local 512-pixel tiled overhead forest floor. Prompt: dark fantasy forest clearing, muted moss-green grass, weathered charcoal flagstones, tiny fallen leaves, subtle roots, even lighting, restrained contrast, no focal objects, characters, text, or interface.
+
+All art ships locally and is included in the offline cache. No external artwork URLs, branded game assets, or proprietary territory maps are used.

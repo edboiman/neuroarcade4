@@ -22,17 +22,17 @@ const mime={'.html':'text/html','.js':'application/javascript','.css':'text/css'
   browser=await chromium.launch({executablePath:process.env.BROWSER_EXECUTABLE||undefined,args:['--no-sandbox','--disable-dev-shm-usage','--disable-gpu','--disable-software-rasterizer','--no-zygote'],headless:true});
   const context=await browser.newContext({viewport:{width:412,height:915}}),page=await context.newPage();page.setDefaultTimeout(15000);
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(base);await page.locator('.card').first().waitFor();assert.equal(await page.locator('.card').count(),5);
+  await page.goto(base);if(process.env.LEGACY_IS_V2){await page.locator('.game-card').first().waitFor();assert.equal(await page.locator('.game-card').count(),10);}else{await page.locator('.card').first().waitFor();assert.equal(await page.locator('.card').count(),5);}
   await page.evaluate(()=>{const data=JSON.parse(localStorage.getItem('neuroarcade.v1')||'{}');data.onboarded=true;data.seenWeek=0;data.sessions=[{g:'blockfit',t:Date.now(),d:120,s:1234,l:2,a:null,c:true}];localStorage.setItem('neuroarcade.v1',JSON.stringify(data));});
   await page.evaluate(async()=>{await navigator.serviceWorker.ready;});await page.reload();
-  await page.getByRole('heading',{name:'A new week begins',exact:true}).waitFor();
-  console.log('Reproduced legacy installation: five games and blocking weekly entry dialog.');
+  if(!process.env.LEGACY_IS_V2)await page.getByRole('heading',{name:'A new week begins',exact:true}).waitFor();
+  console.log(process.env.LEGACY_IS_V2?'Loaded previous 2.0.1 installation with ten games.':'Reproduced legacy installation: five games and blocking weekly entry dialog.');
   release='current';
   await page.evaluate(async()=>{const r=await navigator.serviceWorker.getRegistration();await r.update();});
-  await page.getByRole('button',{name:'All games (10)',exact:true}).waitFor();
-  assert.equal(await page.locator('.game-card').count(),10);assert.equal(await page.locator('[role="dialog"]').count(),0);
+  await page.getByRole('button',{name:'Games (12)',exact:true}).waitFor();
+  assert.equal(await page.locator('.game-card').count(),12);assert.equal(await page.locator('[role="dialog"]').count(),0);
   assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('neuroarcade.v1')).sessions[0].s),1234);
-  console.log('PASS cached five-game install upgrades to ten games; entry gate removed; score preserved.');
+  console.log('PASS cached five-game install upgrades to twelve games; entry gate removed; score preserved.');
   await page.getByRole('button',{name:'Play Block Fit',exact:true}).click();await page.locator('.game-overlay').waitFor();assert.equal(await page.locator('.modal').count(),0);
   await page.locator('.go-actions .primary').click();await page.locator('.bf canvas').waitFor();
   overrideVersion='fffffff001';
@@ -40,7 +40,7 @@ const mime={'.html':'text/html','.js':'application/javascript','.css':'text/css'
   await page.waitForTimeout(1700);assert.equal(await page.locator('.bf canvas').count(),1);
   console.log('PASS update preserves an active game instead of reloading mid-run.');
   await page.getByRole('button',{name:'Pause menu',exact:true}).click();await page.getByRole('button',{name:'Save & leave',exact:true}).click();
-  await page.getByRole('button',{name:'All games (10)',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Games (12)',exact:true}).waitFor();
   assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('neuroarcade.v1')).sessions[0].s),1234);
   assert.ok(await page.evaluate(()=>!!localStorage.getItem('neuroarcade.v1.save.blockfit')));
   console.log('PASS update completes after leaving the game; checkpoint and score preserved.');

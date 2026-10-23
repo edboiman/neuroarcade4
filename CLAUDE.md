@@ -1,4 +1,4 @@
-# Neuro Arcade 2: project notes
+# Neuro Arcade 2.1: project notes
 
 Offline-first PWA, vanilla ES modules, static hosting including GitHub Pages subpaths. No runtime dependencies. Preserve old local progress and the existing CSP.
 
@@ -13,7 +13,7 @@ Offline-first PWA, vanilla ES modules, static hosting including GitHub Pages sub
 - `js/catalog.js`: pure shared catalog. Game IDs flow into weekly rules and storage from here.
 - `js/registry.js`: catalog plus lazy module loaders.
 - `js/main.js`: guarded async routing, active play clock, session/result storage, PWA update flow.
-- `js/hub.js`, `js/miniatures.js`, `css/hub.css`: arcade, filters, library, daily launch, room decoration.
+- `js/hub.js`, `js/miniatures.js`, `css/hub.css`: Games/Progress navigation, category filters, direct launch and saved games.
 - `js/session.js`: local daily seeds and configurable session goals.
 - `js/checkpoint.js`: bounded versioned snapshots; serializes typed tiles, RNG states, and Sets.
 - `js/game-validation.js`: original game snapshot validators; dungeon and new rooms have validators beside their engines.
@@ -21,6 +21,10 @@ Offline-first PWA, vanilla ES modules, static hosting including GitHub Pages sub
 - `js/reviews.js`: date-based language reviews. Vocabulary progress remains shared across scenarios.
 - `js/speech.js`: installed local voices only; no remote speech fallback.
 - `css/games.css`: layout foundations. `css/theme.css`: shared materials and original game world styling. `css/rooms.css`: new game layouts.
+
+- `js/games/marbleworks-core.js` / `marbleworks.js`: fixed-step circle/segment physics, authored challenges, editor, and free bench. Challenge medals also persist in numeric preferences.
+- `js/games/conquest-core.js` / `conquest.js`: original connected territory map, fair dice/card/fortification rules, bounded animated AI turns. `aiStep(state, true)` can simulate all four banners in tests.
+- `css/expansion.css`: new game and catalog styling. Horde sprite/floor WebP assets are precached and used in live gameplay.
 
 ## Critical invariants
 

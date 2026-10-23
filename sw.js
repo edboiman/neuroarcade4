@@ -1,7 +1,7 @@
 // Offline cache. All files are stored at install time and served cache-first.
 // This worker never contacts any server except to download this app's own files once per update,
 // and it ignores every cross-origin request.
-const VERSION = 'a66edab2e0';
+const VERSION = '8c0f12567e';
 const LEGACY_PREFIX = 'neuro-arcade-';
 const PREFIX = 'neuro-arcade:' + new URL(self.registration.scope).pathname + ':';
 const CACHE = PREFIX + VERSION;
@@ -13,7 +13,10 @@ const PRECACHE = [
   './assets/city.webp',
   './assets/dungeon.webp',
   './assets/forest.webp',
+  './assets/horde-actors.webp',
+  './assets/horde-ground.webp',
   './css/base.css',
+  './css/expansion.css',
   './css/games.css',
   './css/hub.css',
   './css/rooms.css',
@@ -39,6 +42,8 @@ const PRECACHE = [
   './js/games/cafe-lesson.js',
   './js/games/cafe.js',
   './js/games/common.js',
+  './js/games/conquest-core.js',
+  './js/games/conquest.js',
   './js/games/dungeon-art.js',
   './js/games/dungeon-core.js',
   './js/games/dungeon.js',
@@ -48,6 +53,8 @@ const PRECACHE = [
   './js/games/item-art.js',
   './js/games/lingo-art.js',
   './js/games/lingo-scenes.js',
+  './js/games/marbleworks-core.js',
+  './js/games/marbleworks.js',
   './js/games/rng.js',
   './js/games/rooms-core.js',
   './js/games/rooms.js',

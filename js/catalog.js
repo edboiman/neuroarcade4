@@ -1,4 +1,6 @@
 export const CATALOG = [
+  {id:'marbleworks',name:'Marbleworks',category:'Puzzle',duration:'Free pace',minutes:8,world:'atelier',tag:'Build a little chain reaction',blurb:'Arrange wooden rails, spring bumpers and air lifts. Guide a glass marble through six physics challenges or build freely.',trains:['Spatial reasoning','Experimentation'],accent:'#d6b784',accent2:'#8cb5ad',rgb:'214,183,132'},
+  {id:'conquest',name:'Bannerfall',category:'Strategy',duration:'20–45 min',minutes:30,world:'atlas',tag:'Thirty territories. One banner.',blurb:'Reinforce, roll for territory, and control six original continents. Conquer a world against three AI rivals.',trains:['Planning','Probability sense'],accent:'#7ebdb6',accent2:'#debd78',rgb:'126,189,182'},
   {
     id: 'blockfit', category: 'Puzzle', duration: '3 min', world: 'orbital', minutes: 3,
     name: 'Block Fit',
@@ -29,10 +31,10 @@ export const CATALOG = [
     rgb: '183,148,255',
   },
   {
-    id: 'survivor', category: 'Action', duration: '4 min', world: 'forest', minutes: 4,
+    id: 'survivor', category: 'Action', duration: '10 min', world: 'forest', minutes: 10,
     name: 'Holiday Horde',
-    tag: 'Action',
-    blurb: 'Hold off a swarm until dawn. Auto-aim or aim it yourself, collect gems and build your weapon. The theme follows the season.',
+    tag: 'Survive. Evolve. Overwhelm.',
+    blurb: 'Survive ten minutes of escalating hordes. Stack six automatic weapons, open elite chests, and evolve your build into a screen-clearing arsenal.',
     trains: ['Divided attention', 'Spatial awareness', 'Quick decisions'],
     accent: '#ff5878',
     accent2: '#ff9a5c',

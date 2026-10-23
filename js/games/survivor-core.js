@@ -4,7 +4,7 @@ import { mulberry32, weighted } from './rng.js';
 
 export const RUN_SECONDS = 240;
 export const HERO_R = 10;
-const MAX_ENEMIES = 150;
+const MAX_ENEMIES = 240;
 const MAX_GEMS = 260;
 
 export const ENEMY = {
@@ -18,6 +18,9 @@ export const ENEMY = {
 // path: gun = how you shoot, guard = how you survive up close, move = how you travel and collect.
 export const PATHS = { gun: 'Gunner', guard: 'Guardian', move: 'Runner' };
 export const UPGRADES = {
+  axes: { path: 'gun', name: 'Crescent axes', icon: '☾', max: 4, text: 'Lob spinning blades into the horde. Evolution: Lv 4 + Hit harder Lv 3.' },
+  storm: { path: 'gun', name: 'Stormcall', icon: 'ϟ', max: 4, text: 'Lightning strikes nearby enemies. Evolution: Lv 4 + Magnet Lv 3.' },
+  tome: { path: 'guard', name: 'Ember scripture', icon: '♨', max: 4, text: 'Scorch the ground beneath enemies. Evolution: Lv 4 + Recover Lv 2.' },
   multi: { path: 'gun', name: 'Extra shot', icon: '🎯', max: 4, text: 'Fire one more projectile at once.' },
   rate: { path: 'gun', name: 'Quick hands', icon: '⚡', max: 5, text: 'Shoot 15% faster.' },
   power: { path: 'gun', name: 'Hit harder', icon: '💪', max: 5, text: 'Shots do more damage.' },
@@ -25,8 +28,8 @@ export const UPGRADES = {
   homing: { path: 'gun', name: 'Seeker shots', icon: '🧭', max: 3, text: 'Shots curve toward nearby enemies.' },
   bounce: { path: 'gun', name: 'Ricochet', icon: '🔁', max: 3, text: 'A shot that hits jumps to another enemy.' },
   rear: { path: 'gun', name: 'Back shot', icon: '↩️', max: 2, text: 'Also fire behind you.' },
-  orbit: { path: 'guard', name: 'Guardians', icon: '🛡️', max: 4, text: 'Orbs circle you and hurt anything they touch.' },
-  nova: { path: 'guard', name: 'Shock pulse', icon: '💥', max: 4, text: 'A pulse around you every few seconds.' },
+  orbit: { path: 'guard', name: 'Orbit blades', icon: '🛡️', max: 4, text: 'Blades circle you. Evolution: Lv 4 + Light feet Lv 3.' },
+  nova: { path: 'guard', name: 'Shock pulse', icon: '💥', max: 4, text: 'A pulse around you. Evolution: Lv 4 + Tough Lv 3.' },
   heart: { path: 'guard', name: 'Tough', icon: '❤️', max: 5, text: '+25 max health and heal 25.' },
   regen: { path: 'guard', name: 'Recover', icon: '🩹', max: 4, text: 'Slowly heal over time.' },
   speed: { path: 'move', name: 'Light feet', icon: '👟', max: 5, text: 'Move 9% faster.' },
@@ -58,12 +61,13 @@ const POINT_BLANK = 0.08;
 export const MANUAL_BONUS = 1.35; // aiming yourself is harder, so it hits harder
 export const REROLLS = 2;
 
-export function createRun(seed = 1, { manual = false } = {}) {
+export function createRun(seed = 1, { manual = false, duration = RUN_SECONDS, modern = false } = {}) {
   const rnd = mulberry32(seed);
   return {
     seed,
     rnd,
     manual,
+    duration, modern, chests: [], pools: [], weaponCd: {axes:1,storm:2,tome:3}, evolutions: [],
     rerolls: REROLLS,
     t: 0,
     over: false,
@@ -104,7 +108,7 @@ export const shotCount = (r) => 1 + r.up.multi;
 export const shotDamage = (r) => 1.5 + 0.6 * r.up.power;
 export const shotPierce = (r) => r.up.pierce;
 export const magnetRadius = (r) => 46 * (1 + 0.45 * r.up.magnet);
-export const orbCount = (r) => r.up.orbit;
+export const orbCount = (r) => r.up.orbit + (r.evolutions?.includes('orbit') ? 2 : 0);
 export const novaInterval = (r) => 7.5 - r.up.nova * 1.1;
 export const regenRate = (r) => 0.6 * r.up.regen;
 const hpScale = (t) => 1 + t / 110;
@@ -178,16 +182,16 @@ function chooseKind(run) {
 }
 
 function spawnLogic(run, dt) {
-  run.spawnAcc += spawnRate(run.t) * dt;
+  run.spawnAcc += spawnRate(run.t) * (run.modern ? 1.9 : 1) * dt;
   while (run.spawnAcc >= 1) {
     run.spawnAcc -= 1;
     const p = edgePoint(run, 34);
     addEnemy(run, chooseKind(run), p.x, p.y);
   }
-  for (const at of [55, 105, 155, 200]) {
+  for (const at of (run.modern ? [40,85,140,200,260,320,380,440,500,550] : [55,105,155,200])) {
     if (run.t >= at && !run.waveDone[at]) {
       run.waveDone[at] = true;
-      const n = 16 + Math.floor(at / 12);
+      const n = Math.min(65,16 + Math.floor(at / 12));
       const r = Math.max(run.view.hw, run.view.hh) * 1.12;
       for (let i = 0; i < n; i++) {
         const a = (i / n) * Math.PI * 2;
@@ -196,7 +200,7 @@ function spawnLogic(run, dt) {
       run.events.push({ type: 'wave' });
     }
   }
-  for (const at of [95, 190]) {
+  for (const at of (run.modern ? [110,230,350,470,570] : [95,190])) {
     if (run.t >= at && !run.bossDone[at]) {
       run.bossDone[at] = true;
       const p = edgePoint(run, 60);
@@ -279,6 +283,7 @@ export function step(run, dt, input, aim) {
     }
     e.x += vx * dt;
     e.y += vy * dt;
+    if(run.modern&&(Math.abs(e.x-h.x)>run.view.hw*2.4||Math.abs(e.y-h.y)>run.view.hh*2.4)){const p=edgePoint(run,70);e.x=p.x;e.y=p.y;}
     if (e.hit > 0) e.hit -= dt;
     if (e.orbCd > 0) e.orbCd -= dt;
   }
@@ -410,7 +415,7 @@ export function step(run, dt, input, aim) {
       for (const e of run.enemies) {
         if (e.hp <= 0 || e.orbCd > 0) continue;
         if (Math.hypot(e.x - ox, e.y - oy) < ENEMY[e.kind].r + 9) {
-          hurtEnemy(run, e, 0.8 + 0.3 * run.up.power);
+          hurtEnemy(run, e, (0.8 + 0.3 * run.up.power) * (run.evolutions?.includes('orbit')?2:1));
           e.orbCd = 0.35;
         }
       }
@@ -422,11 +427,13 @@ export function step(run, dt, input, aim) {
     run.novaCd -= dt;
     if (run.novaCd <= 0) {
       run.novaCd = novaInterval(run);
-      const rad = 105 + run.up.nova * 12;
-      for (const e of run.enemies) if (e.hp > 0 && Math.hypot(e.x - h.x, e.y - h.y) < rad + ENEMY[e.kind].r) hurtEnemy(run, e, 2.5 + 0.5 * run.up.nova);
+      const rad = 105 + run.up.nova * 12 + (run.evolutions?.includes('nova')?55:0);
+      for (const e of run.enemies) if (e.hp > 0 && Math.hypot(e.x - h.x, e.y - h.y) < rad + ENEMY[e.kind].r) hurtEnemy(run, e, (2.5 + 0.5 * run.up.nova) * (run.evolutions?.includes('nova')?2:1));
       run.events.push({ type: 'nova', r: rad });
     }
   }
+
+  arsenalStep(run, dt);
 
   // clean up
   run.shots = run.shots.filter((s) => s.life > 0);
@@ -458,8 +465,8 @@ export function step(run, dt, input, aim) {
     run.over = true;
     run.reason = 'down';
     run.events.push({ type: 'lose' });
-  } else if (run.t >= RUN_SECONDS) {
-    run.t = RUN_SECONDS;
+  } else if (run.t >= (run.duration || RUN_SECONDS)) {
+    run.t = run.duration || RUN_SECONDS;
     run.over = true;
     run.reason = 'dawn';
     run.events.push({ type: 'win' });
@@ -589,10 +596,13 @@ function steer(run, s, dt) {
 }
 
 function hurtEnemy(run, e, dmg) {
+  if(e.hp<=0)return;
+  if(run.modern)run.events.push({type:'damage',x:e.x,y:e.y,value:Math.ceil(dmg)});
   e.hp -= dmg;
   e.hit = 0.1;
   if (e.hp <= 0) {
     run.kills++;
+    if(run.modern&&(e.kind==='boss'||e.elite)){if(run.chests.length>=64)run.chests.shift();run.chests.push({x:e.x,y:e.y});}
     const def = ENEMY[e.kind];
     if (e.kind === 'boss') {
       for (let i = 0; i < 3; i++) dropGem(run, e.x + (i - 1) * 14, e.y, def.xp);
@@ -654,4 +664,19 @@ export function seasonalStep(run, dt) {
   }
  }
  run.hazards=run.hazards.filter(z=>z.t<z.windup+.7);
+}
+
+
+export const EVOLUTIONS={axes:{name:'Reaper crescents',need:'power',rank:3},storm:{name:'Tempest crown',need:'magnet',rank:3},tome:{name:'Infernal codex',need:'regen',rank:2},orbit:{name:'Solar procession',need:'speed',rank:3},nova:{name:'Black star',need:'heart',rank:3}};
+export function migrateRun(r){r.modern=true;r.duration ||= RUN_SECONDS;r.chests ||= [];r.pools ||= [];r.weaponCd ||= {axes:1,storm:2,tome:3};r.evolutions ||= [];for(const k of UPGRADE_IDS)r.up[k] ||= 0;return r;}
+export function openChest(r){migrateRun(r);const ready=Object.keys(EVOLUTIONS).find(k=>r.up[k]>=UPGRADES[k].max&&r.up[EVOLUTIONS[k].need]>=EVOLUTIONS[k].rank&&!r.evolutions.includes(k));if(ready){r.evolutions.push(ready);r.events.push({type:'evolution',name:EVOLUTIONS[ready].name});return ready;}const owned=UPGRADE_IDS.filter(k=>r.up[k]>0&&r.up[k]<UPGRADES[k].max);if(owned.length){const k=owned[Math.floor(r.rnd()*owned.length)];const pending=r.pending;applyUpgrade(r,k);r.pending=pending;r.events.push({type:'treasure',name:UPGRADES[k].name});}r.hero.hp=Math.min(r.hero.maxHp,r.hero.hp+30);return null;}
+function arsenalStep(r,dt){if(!r.modern)return;const h=r.hero,has=k=>r.evolutions.includes(k),damage=1+r.up.power*.18;
+ for(let i=r.chests.length-1;i>=0;i--)if(Math.hypot(r.chests[i].x-h.x,r.chests[i].y-h.y)<32){r.chests.splice(i,1);openChest(r);}
+ for(const k of ['axes','storm','tome']){if(!r.up[k])continue;r.weaponCd[k]-=dt;if(r.weaponCd[k]>0)continue;const target=nearestEnemy(r,h.x,h.y,340);if(!target){r.weaponCd[k]=0;continue;}const rank=r.up[k],evolved=has(k);r.weaponCd[k]=({axes:2.4,storm:3.8,tome:4.2}[k]-.15*rank)*Math.pow(.8,r.ms.frenzy);
+ if(k==='axes'){const a=Math.atan2(target.y-h.y,target.x-h.x);for(let i=0;i<1+Math.floor(rank/2)+(evolved?2:0);i++){const angle=a+(i-(Math.floor(rank/2)+(evolved?2:0))/2)*.3;r.shots.push({x:h.x,y:h.y,vx:Math.cos(angle)*205,vy:Math.sin(angle)*205,life:1.8,age:0,pierce:evolved?25:2+rank,hit:new Set(),dmg:(2+rank)*damage*(evolved?1.8:1),homing:0,bounce:0,axe:true});}}
+ if(k==='storm'){const targets=[...r.enemies].filter(e=>e.hp>0).sort((a,b)=>Math.hypot(a.x-h.x,a.y-h.y)-Math.hypot(b.x-h.x,b.y-h.y)).slice(0,rank+(evolved?4:0));for(const e of targets){hurtEnemy(r,e,(3+rank)*damage*(evolved?1.8:1));r.events.push({type:'lightning',x:e.x,y:e.y});}}
+ if(k==='tome')r.pools.push({x:target.x,y:target.y,r:36+rank*8+(evolved?30:0),life:3+rank*.3,cd:0,dmg:(1+rank*.5)*damage*(evolved?2:1)});
+ }
+ for(const p of r.pools){p.life-=dt;p.cd-=dt;if(p.cd<=0){p.cd=.45;for(const e of r.enemies)if(e.hp>0&&Math.hypot(e.x-p.x,e.y-p.y)<p.r+ENEMY[e.kind].r)hurtEnemy(r,e,p.dmg);}}
+ r.pools=r.pools.filter(p=>p.life>0);
 }

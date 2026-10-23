@@ -4,7 +4,13 @@ export function miniature(g) {
  const art=s('svg',{viewBox:'0 0 400 240',preserveAspectRatio:'xMidYMid slice','aria-hidden':'true'});
  const rect=(x,y,w,h,fill,rx=0)=>s('rect',{x,y,width:w,height:h,fill,rx});
  art.append(rect(0,0,400,240,'#1a3036'),s('circle',{cx:330,cy:30,r:120,fill:g.accent,opacity:.12}));
- if(g.id==='signal'){
+ if(g.id==='marbleworks'){
+  for(let x=20;x<400;x+=30)for(let y=20;y<240;y+=30)art.append(s('circle',{cx:x,cy:y,r:1,fill:'#72938f',opacity:.3}));
+  for(const [x,y,x2,y2]of [[-10,45,135,85],[138,100,270,155],[262,173,365,210]])art.append(s('path',{d:`M${x} ${y}L${x2} ${y2}`,stroke:'#ad8059','stroke-width':12,'stroke-linecap':'round'}),s('path',{d:`M${x} ${y-4}L${x2} ${y2-4}`,stroke:'#e5c793','stroke-width':2}));
+  art.append(s('circle',{cx:183,cy:104,r:16,fill:'#96d4de',stroke:'#e5fbff','stroke-width':3}),s('circle',{cx:178,cy:99,r:4,fill:'#f4ffff'}),s('path',{d:'M324 187h60l-9 46h-42Z',fill:'#c4a26b'}),s('ellipse',{cx:354,cy:187,rx:30,ry:7,fill:'#253b39',stroke:'#edce92','stroke-width':2}));
+ }else if(g.id==='conquest'){
+  for(let i=0;i<6;i++){let x=55+(i%3)*140,y=55+Math.floor(i/3)*120;for(let j=0;j<5;j++){const cx=x+(j%3)*25,cy=y+Math.floor(j/3)*32;art.append(s('path',{d:`M${cx} ${cy-21}l20 10v22l-20 11 -20 -11v-22Z`,fill:['#3e8c8a','#a25e4d','#776092','#b79b5c'][(i+j)%4],stroke:'#1a3036','stroke-width':2}));}art.append(s('circle',{cx:x+24,cy:y+4,r:11,fill:'#172c35',stroke:'#e8d19e'}),s('text',{x:x+24,y:y+8,'text-anchor':'middle',fill:'#efdfb5','font-size':11},String(i+3)));}
+ }else if(g.id==='signal'){
   for(let r=0;r<3;r++){
    const y=60+r*63;
    for(let x=0;x<400;x+=17)art.append(rect(x,y-13,5,26,'#635d4d',2));

@@ -14,7 +14,7 @@ const shot=async name=>{if(process.env.QA_OUTPUT_DIR){fs.mkdirSync(process.env.Q
 page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text().slice(0,300))});page.on('response',r=>{if(r.status()>=400)failRequests.push(r.url()+': '+r.status());});
 await page.goto(base);await page.waitForTimeout(350);
 await shot('arcade-mobile');
-const games=[['blockfit','Block Fit'],['dungeon','Deep Delve'],['survivor','Holiday Horde'],['estate','Tycoon Row'],['cafe','Lingo'],['signal','Signal Junction'],['workshop','Clockwork Workshop'],['casebook','Casebook'],['echo','Echo Garden'],['logistics','Pocket Logistics']];
+const games=[['blockfit','Block Fit'],['dungeon','Deep Delve'],['survivor','Holiday Horde'],['estate','Tycoon Row'],['cafe','Lingo'],['signal','Signal Junction'],['workshop','Clockwork Workshop'],['casebook','Casebook'],['echo','Echo Garden'],['logistics','Pocket Logistics'],['marbleworks','Marbleworks'],['conquest','Bannerfall']];
 for(const [id,name]of games){
  try{
  await page.getByRole('button',{name:'Play '+name,exact:true}).click();
@@ -24,6 +24,20 @@ for(const [id,name]of games){
  if(id==='cafe')await page.getByRole('button',{name:'I already know these',exact:true}).click();
  if(id==='dungeon')await page.getByRole('button',{name:'I am ready',exact:true}).click();
  await page.waitForTimeout(id==='estate'?1800:650);
+ if(id==='marbleworks'){
+ const box=await page.locator('.mw-canvas').boundingBox();
+ for(const [x,y]of [[425,255],[585,315]])await page.mouse.click(box.x+x/900*box.width,box.y+y/560*box.height);
+ await page.getByRole('button',{name:'Release marble',exact:true}).click();
+ await page.getByRole('heading',{name:'Delivery complete',exact:true}).waitFor({timeout:15000});
+ await page.getByRole('button',{name:'Keep building',exact:true}).click();
+ }
+ if(id==='conquest'){
+ await page.locator('.territory[aria-label*="Your banner"]').first().click();
+ await page.getByRole('button',{name:/^Place all /}).click();
+ await page.getByRole('button',{name:'Finish attacks → Fortify',exact:true}).click();
+ await page.getByRole('button',{name:'End turn',exact:true}).click();
+ await page.waitForFunction(()=>document.querySelector('.conquest-side .phase-tag')?.textContent==='YOUR TURN · deploy',{},{timeout:20000});
+ }
  if(id==='blockfit')await page.keyboard.press('ArrowDown');
  if(id==='signal')await page.getByRole('button',{name:'Track 2, junction 1: straight',exact:true}).click();
  if(id==='workshop')await page.getByRole('button',{name:'Conduit row 1, column 1',exact:true}).click();
@@ -43,8 +57,8 @@ for(const [id,name]of games){
  console.log('PASS',name,'launch, input, pause, save, continue');
  }catch(e){console.log('FAIL',name,e.message.slice(0,400));console.log((await page.locator('body').innerText()).slice(-1200));throw e;}
 }
-await page.getByRole('button',{name:'Your room',exact:true}).click();await shot('collection-mobile');await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('switch',{name:'Larger text',exact:true}).click();await page.getByRole('switch',{name:'Reduce motion',exact:true}).click();await page.getByRole('button',{name:'Back',exact:true}).click();await page.getByRole('button',{name:'Progress',exact:true}).click();await page.getByRole('heading',{name:'Progress',exact:true}).waitFor();console.log('PASS rendered progress');await shot('progress-mobile');await page.getByRole('button',{name:'Back',exact:true}).click();await page.locator('.arcade-header').waitFor();
-console.log('PASS settings, collection, progress');
+await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('switch',{name:'Larger text',exact:true}).click();await page.getByRole('switch',{name:'Reduce motion',exact:true}).click();await page.getByRole('button',{name:'Back',exact:true}).click();await page.getByRole('button',{name:'Progress',exact:true}).click();await page.getByRole('heading',{name:'Progress',exact:true}).waitFor();console.log('PASS rendered progress');await shot('progress-mobile');await page.getByRole('button',{name:'Back',exact:true}).click();await page.locator('.arcade-header').waitFor();
+console.log('PASS settings and progress');
 await page.evaluate(async()=>{await navigator.serviceWorker.ready;});await page.reload();await page.locator('.arcade-header').waitFor();await context.setOffline(true);await page.reload();await page.locator('.arcade-header').waitFor();console.log('PASS offline reload');await context.setOffline(false);
 const sub=await browser.newContext({viewport:{width:1440,height:1000}});const sp=await sub.newPage();sp.setDefaultTimeout(10000);await sp.goto(base+'/test-subpath/');await sp.locator('.arcade-header').waitFor();await sp.evaluate(async()=>{await navigator.serviceWorker.ready;});await sp.reload();await sp.locator('.arcade-header').waitFor();await sub.setOffline(true);await sp.reload();await sp.getByRole('button',{name:'Settings',exact:true}).click();await sp.getByRole('switch',{name:'Larger text',exact:true}).waitFor();console.log('PASS offline subpath hosting and Settings import');await sub.close();
 console.log(JSON.stringify({errors,failRequests}));if(errors.length||failRequests.length)throw Error('Browser errors were recorded');

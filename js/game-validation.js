@@ -9,8 +9,15 @@ export function validBlocks(g) {
 }
 export function validHorde(g) {
  const point=p=>p&&number(p.x,-1e7,1e7)&&number(p.y,-1e7,1e7);
- if(!g||typeof g.rnd!=='function'||!number(g.t,0,240)||!g.hero||!point(g.hero)||!number(g.hero.hp,1e-6,10000)||!number(g.hero.maxHp,1,10000)||g.hero.hp>g.hero.maxHp||!int(g.level,1,999)||!g.up||!g.ms||!g.view||!Array.isArray(g.milestonesHit)||!g.waveDone||!g.bossDone)return false;
+ if(!g||typeof g.rnd!=='function'||!number(g.t,0,900)||!g.hero||!point(g.hero)||!number(g.hero.hp,1e-6,10000)||!number(g.hero.maxHp,1,10000)||g.hero.hp>g.hero.maxHp||!int(g.level,1,999)||!g.up||!g.ms||!g.view||!Array.isArray(g.milestonesHit)||!g.waveDone||!g.bossDone)return false;
  for(const k of ['multi','rate','power','pierce','homing','bounce','rear','orbit','nova','heart','regen','speed','magnet'])if(!int(g.up[k],0,k==='speed'?6:10))return false;
  for(const k of ['pet','petRate','petPower','petMulti','chain','blast','shield','frenzy','surge','feast'])if(!int(g.ms[k],0,99))return false;
- return Array.isArray(g.enemies)&&g.enemies.length<=150&&g.enemies.every(e=>point(e)&&['grunt','swift','tank','swarm','boss'].includes(e.kind)&&number(e.hp,0,10000))&&Array.isArray(g.shots)&&g.shots.length<=600&&g.shots.every(p=>point(p)&&number(p.vx,-1e5,1e5)&&number(p.vy,-1e5,1e5)&&number(p.life,0,100))&&Array.isArray(g.gems)&&g.gems.length<=260&&g.gems.every(p=>point(p)&&number(p.v,0,100))&&(!g.pet||point(g.pet));
+ if(g.duration!==undefined&&!number(g.duration,60,900))return false;
+ for(const k of ['axes','storm','tome'])if(g.up[k]!==undefined&&!int(g.up[k],0,4))return false;
+ if(g.evolutions!==undefined&&(!Array.isArray(g.evolutions)||g.evolutions.length>5||g.evolutions.some(k=>!['axes','storm','tome','orbit','nova'].includes(k))))return false;
+ for(const k of ['chests','pools'])if(g[k]!==undefined&&(!Array.isArray(g[k])||g[k].length>100||g[k].some(p=>!point(p))))return false;
+ if(g.pools?.some(p=>!number(p.r,1,300)||!number(p.life,-1,20)||!number(p.cd,-1,20)||!number(p.dmg,0,1000)))return false;
+ if(g.modern!==undefined&&typeof g.modern!=='boolean')return false;
+ if(g.weaponCd!==undefined&&(!g.weaponCd||!['axes','storm','tome'].every(k=>number(g.weaponCd[k],-1,20))))return false;
+ return Array.isArray(g.enemies)&&g.enemies.length<=245&&g.enemies.every(e=>point(e)&&['grunt','swift','tank','swarm','boss'].includes(e.kind)&&number(e.hp,0,10000))&&Array.isArray(g.shots)&&g.shots.length<=600&&g.shots.every(p=>point(p)&&number(p.vx,-1e5,1e5)&&number(p.vy,-1e5,1e5)&&number(p.life,0,100))&&Array.isArray(g.gems)&&g.gems.length<=260&&g.gems.every(p=>point(p)&&number(p.v,0,100))&&(!g.pet||point(g.pet));
 }
