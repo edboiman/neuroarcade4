@@ -1,267 +1,51 @@
-// Home screen: a console-style carousel. One swipe moves exactly one game; tap the centered card (or Play) to enter.
-import { h, s, icon, haptic, toast, fmtNum } from './ui.js';
+import { h, icon, fill, modal } from './ui.js';
 import { GAMES } from './registry.js';
 import { store } from './store.js';
-import { rotation, overdue, streak, weeklySeries, weekDelta, daysUntil, sessionsInWeek, weekStart } from './weekly.js';
 import { gameArt } from './art.js';
+import { miniature, decorationArt } from './miniatures.js';
+import { dailySeed, goalProgress } from './session.js';
 
-export function mountHub(root, ctx) {
-  const now = Date.now();
-  const sessions = store.sessions();
-  const rot = rotation(sessions, now);
-  const st = streak(sessions, now);
-  const due = overdue(sessions, now);
-  const dueText = (x) => (x.never ? 'Not played yet' : `Not played in ${x.days} days`);
-  const checkedInThisWeek = store.checkins().some((c) => c.t >= rot.weekStart);
-  // Open on the most overdue game, else the first one not yet played this week.
-  let focus = due.length ? GAMES.findIndex((g) => g.id === due[0].id) : Math.max(0, GAMES.findIndex((g) => rot.counts[g.id] === 0));
-  if (rot.complete) {
-    // land on the game played least this week
-    focus = GAMES.reduce((best, g, i) => (rot.counts[g.id] < rot.counts[GAMES[best].id] ? i : best), 0);
-  }
-  let raf = 0;
-  let step = 1;
-
-  // ---- backdrop: one layer per game, cross-faded with opacity (cheap on the GPU) ----
-  const backdrop = h(
-    'div',
-    { class: 'hub-backdrop', 'aria-hidden': 'true' },
-    GAMES.map((g) => h('div', { class: 'bd', style: { '--ar': g.rgb, '--a': g.accent, '--b': g.accent2 } })),
-  );
-
-  // ---- top strip ----
-  const clock = h('span', { class: 'hub-clock' });
-  const left = daysUntil(rot.nextWeek, now);
-  const rotationLabel = rot.complete
-    ? 'Rotation complete'
-    : `${rot.playedCount} of ${GAMES.length} played this week`;
-  const top = h(
-    'header',
-    { class: 'hub-top' },
-    h(
-      'div',
-      { class: 'rotation', role: 'group', 'aria-label': 'Weekly rotation progress' },
-      h(
-        'div',
-        { class: 'rot-segs' },
-        GAMES.map((g) =>
-          h('span', {
-            class: 'rot-seg' + (rot.counts[g.id] > 0 ? ' done' : ''),
-            style: { '--a': g.accent },
-            title: g.name + (rot.counts[g.id] > 0 ? ' played' : ' not played yet'),
-          }),
-        ),
-      ),
-      h(
-        'span',
-        { class: 'rot-text' },
-        rotationLabel + (rot.complete ? '' : `, ${left} ${left === 1 ? 'day' : 'days'} left`) + (st > 0 ? `, ${st}-week streak` : ''),
-      ),
-    ),
-    clock,
-  );
-
-  // ---- carousel ----
-  const track = h('div', { class: 'track', role: 'listbox', 'aria-label': 'Games', tabindex: '0' });
-  const cards = GAMES.map((g, i) => {
-    const late = due.find((x) => x.id === g.id);
-    const played = rot.counts[g.id] > 0;
-    const card = h(
-      'div',
-      {
-        class: 'card' + (late ? ' overdue' : ''),
-        role: 'option',
-        'aria-label': g.name + (late ? ', ' + dueText(late) : ''),
-        style: { '--a': g.accent, '--b': g.accent2, '--ar': g.rgb },
-        onclick: () => {
-          if (i === focus) enter(i);
-          else scrollTo(i);
-        },
-      },
-      h('div', { class: 'card-art' }, gameArt(g)),
-      h(
-        'div',
-        { class: 'card-meta' },
-        h('span', { class: 'card-tag' }, g.tag),
-        h('strong', { class: 'card-name' }, g.name),
-      ),
-      played ? h('span', { class: 'card-badge', 'aria-label': 'Played this week' }, icon('check', 18)) : null,
-      late ? h('span', { class: 'card-due' }, dueText(late)) : null,
-    );
-    return card;
-  });
-  track.append(...cards);
-
-  const prev = h('button', { class: 'nav-arrow left', type: 'button', 'aria-label': 'Previous game', onclick: () => scrollTo(focus - 1) }, icon('left', 22));
-  const next = h('button', { class: 'nav-arrow right', type: 'button', 'aria-label': 'Next game', onclick: () => scrollTo(focus + 1) }, icon('right', 22));
-  const stage = h('div', { class: 'hub-stage' }, track, prev, next);
-
-  // ---- info panel ----
-  const info = {
-    name: h('h1', { class: 'info-name' }),
-    blurb: h('p', { class: 'info-blurb' }),
-    trains: h('p', { class: 'info-trains' }),
-    stat: h('p', { class: 'info-stat' }),
-    play: h('button', { class: 'play-btn', type: 'button', onclick: () => enter(focus) }),
-    quick: h('div', { class: 'info-quick', role: 'group', 'aria-label': 'Jump straight in' }),
-  };
-  const dots = h('div', { class: 'dots', 'aria-hidden': 'true' }, GAMES.map(() => h('span', { class: 'dot' })));
-  const infoEl = h(
-    'section',
-    { class: 'hub-info', 'aria-live': 'polite' },
-    dots,
-    info.name,
-    info.blurb,
-    info.trains,
-    info.quick,
-    h('div', { class: 'info-row' }, info.stat, info.play),
-  );
-
-  // ---- dock ----
-  const dockBtn = (name, label, to, dot) =>
-    h(
-      'button',
-      { class: 'dock-btn', type: 'button', onclick: () => ctx.nav.go(to) },
-      h('span', { class: 'dock-ico' }, icon(name, 22), dot ? h('i', { class: 'dock-dot', 'aria-hidden': 'true' }) : null),
-      h('span', { class: 'dock-label' }, label),
-    );
-  const dock = h(
-    'nav',
-    { class: 'hub-dock', 'aria-label': 'More' },
-    dockBtn('stats', 'Progress', 'stats'),
-    dockBtn('pulse', 'Check-in', 'checkin', !checkedInThisWeek),
-    dockBtn('sliders', 'Settings', 'settings', ctx.updateReady()),
-  );
-
-  const names = due.map((x) => GAMES.find((g) => g.id === x.id).name);
-  const warn = due.length
-    ? h('p', { class: 'hub-warn', role: 'status' }, icon('alert', 16),
-        h('span', null, names.length === GAMES.length
-          ? 'Welcome back. Every game is due a turn, so start with any of them.'
-          : names.length === 1
-          ? `${names[0]} hasn't been played in a week or more.`
-          : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]} haven't been played in a week or more.`))
-    : null;
-  const el = h('div', { class: 'screen hub' + (warn ? ' has-warn' : '') }, backdrop, top, warn, stage, infoEl, dock);
-  root.append(el);
-
-  // ---- behavior ----
-  function measure() {
-    step = cards.length > 1 ? cards[1].offsetLeft - cards[0].offsetLeft : 1;
-    if (step <= 0) step = 1;
-  }
-  function scrollTo(i, behavior) {
-    const idx = Math.max(0, Math.min(GAMES.length - 1, i));
-    measure();
-    const smooth = behavior || (store.settings().reduce ? 'auto' : 'smooth');
-    track.scrollTo({ left: idx * step, behavior: smooth });
-  }
-  function weekStat(g) {
-    const series = weeklySeries(sessions, g.id, now, 8);
-    const cur = series[series.length - 1];
-    const d = weekDelta(series);
-    if (cur.n === 0) {
-      const last = [...series].reverse().find((w) => w.n > 0);
-      return last ? `Last played with a best of ${fmtNum(last.best)}` : 'Not played yet';
-    }
-    const arrow = d ? (d.pct >= 0 ? ' up ' : ' down ') + Math.abs(Math.round(d.pct)) + '% on last week' : '';
-    return `This week: best ${fmtNum(cur.best)}${arrow}`;
-  }
-  function render() {
-    const g = GAMES[focus];
-    info.name.textContent = g.name;
-    info.blurb.textContent = g.blurb;
-    info.trains.textContent = 'Exercises: ' + g.trains.join(', ');
-    info.stat.textContent = weekStat(g);
-    info.play.replaceChildren(icon('play', 20), h('span', null, 'Play'));
-    info.quick.replaceChildren(
-      ...(g.quick || []).map((q) =>
-        h(
-          'button',
-          {
-            class: 'quick-chip',
-            type: 'button',
-            onclick: () => {
-              store.setPref(g.id, q.pref, q.value);
-              enter(focus);
-            },
-          },
-          h('span', { 'aria-hidden': 'true' }, q.icon),
-          q.label,
-        ),
-      ),
-    );
-    info.quick.classList.toggle('hidden', !g.quick);
-    const late = due.find((x) => x.id === g.id);
-    if (late) info.stat.textContent = dueText(late) + '. Give it a turn today.';
-    info.play.style.setProperty('--a', g.accent);
-    info.play.style.setProperty('--b', g.accent2);
-    cards.forEach((c, i) => {
-      c.classList.toggle('is-focus', i === focus);
-      c.setAttribute('aria-selected', i === focus ? 'true' : 'false');
-    });
-    backdrop.querySelectorAll('.bd').forEach((b, i) => b.classList.toggle('on', i === focus));
-    dots.querySelectorAll('.dot').forEach((d, i) => {
-      d.classList.toggle('on', i === focus);
-      d.style.setProperty('--a', GAMES[i].accent);
-    });
-    prev.classList.toggle('hidden', focus === 0);
-    next.classList.toggle('hidden', focus === GAMES.length - 1);
-  }
-  function enter(i) {
-    const g = GAMES[i];
-    haptic(12);
-    ctx.nav.go('game', { id: g.id });
-  }
-  function onScroll() {
-    if (raf) return;
-    raf = requestAnimationFrame(() => {
-      raf = 0;
-      if (step <= 1) measure();
-      const i = Math.max(0, Math.min(GAMES.length - 1, Math.round(track.scrollLeft / step)));
-      if (i !== focus) {
-        focus = i;
-        haptic(8);
-        render();
-      }
-    });
-  }
-  function onKey(e) {
-    if (e.key === 'ArrowRight') {
-      scrollTo(focus + 1);
-      e.preventDefault();
-    } else if (e.key === 'ArrowLeft') {
-      scrollTo(focus - 1);
-      e.preventDefault();
-    } else if (e.key === 'Enter' && document.activeElement === track) {
-      enter(focus);
-    }
-  }
-  function tickClock() {
-    clock.textContent = new Date().toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-  }
-
-  track.addEventListener('scroll', onScroll, { passive: true });
-  track.addEventListener('keydown', onKey);
-  tickClock();
-  const clockTimer = setInterval(() => {
-    if (!document.hidden) tickClock();
-  }, 30000);
-  render();
-  requestAnimationFrame(() => {
-    measure();
-    scrollTo(focus, 'auto');
-  });
-  window.addEventListener('resize', measure);
-
-  return {
-    destroy() {
-      clearInterval(clockTimer);
-      cancelAnimationFrame(raf);
-      window.removeEventListener('resize', measure);
-    },
-  };
+export function mountHub(root,ctx){
+ let view=['arcade','library','collection'][store.pref('arcade','view',0)]||'arcade',filter='All',mood='all';
+ const sessions=store.sessions(),goal=goalProgress(store),total=sessions.length;
+ const selected=store.pref('arcade','decor',0),style=store.pref('arcade','roomstyle',0);
+ const el=h('div',{class:`screen arcade roomstyle-${style}`});
+ const content=h('main',{class:'arcade-content',id:'main-content'});
+ const navs=[];
+ const mark=h('span',{class:'brand-mark'},icon('play',20));
+ const header=h('header',{class:'arcade-header'},h('a',{class:'skip-link',href:'#main-content'},'Skip to games'),h('button',{class:'brand',type:'button',onclick:()=>setView('arcade')},mark,h('span',null,h('b',null,'NEURO ARCADE'),h('small',null,'A place to play.'))),h('nav',{'aria-label':'Main navigation'},[['arcade','The arcade'],['library','All games'],['collection','Your room']].map(([id,label])=>{const b=h('button',{class:'nav-link',type:'button',onclick:()=>setView(id)},label);navs.push([id,b]);return b;})),h('div',{class:'header-tools'},h('button',{class:'icon-btn',type:'button','aria-label':'Progress',onclick:()=>ctx.nav.go('stats')},icon('stats',20)),h('button',{class:'icon-btn',type:'button','aria-label':'Settings',onclick:()=>ctx.nav.go('settings')},icon('sliders',20))));
+ el.append(header,content);root.append(el);
+ function setView(v){view=v;store.setPref('arcade','view',['arcade','library','collection'].indexOf(v));render();content.scrollTop=0;}
+ async function launch(g,mode='standard',resume=false){
+  if(resume)return ctx.nav.go('game',{id:g.id,resume:true,mode:store.loadGame(g.id)?.meta?.mode||'standard'});
+  const notes=h('div',{class:'launch-info'},h('p',null,g.blurb),h('p',{class:'fine'},`${g.duration} · ${g.category} · Saved automatically on this device`));
+  const actions=g.id==='blockfit'?[{label:'Play Block Fit',value:'standard',kind:'primary'}]:[{label:'Take it easy',value:'practice'},{label:mode==='daily'?'Play daily challenge':'Let’s play',value:mode,kind:'primary'}];
+  const chosen=await modal({title:g.name,body:notes,actions});
+  if(chosen)ctx.nav.go('game',{id:g.id,mode:chosen,seed:chosen==='daily'?dailySeed(g.id):undefined});
+ }
+ function card(g){
+  const history=sessions.filter(s=>s.g===g.id),save=store.loadGame(g.id),isNew=['signal','workshop','casebook','echo','logistics'].includes(g.id);
+  const picture=['cafe','dungeon','survivor','estate'].includes(g.id)?h('img',{src:`assets/${g.world}.webp`,alt:'',loading:'lazy',decoding:'async'}):g.id==='blockfit'?gameArt(g):miniature(g);
+  return h('article',{class:'game-card',style:{'--game':g.accent}},h('button',{class:'game-cover',type:'button','aria-label':`Play ${g.name}`,onclick:()=>launch(g)},picture,h('span',{class:'cover-category'},g.category),isNew?h('span',{class:'new-tag'},'NEW'):null,h('span',{class:'cover-play'},icon('play',22))),h('div',{class:'game-card-body'},h('div',{class:'card-title-row'},h('h3',null,g.name),h('span',null,g.duration)),h('p',null,g.tag),h('div',{class:'card-footer'},h('small',null,history.length?`${history.length} sessions · best ${Math.max(...history.map(s=>s.s)).toLocaleString()}`:'Your next little adventure'),h('button',{class:'text-btn',type:'button',onclick:()=>launch(g,'standard',!!save)},save?'Continue →':'Play →'))));
+ }
+ function section(title,subtitle,items){return h('section',{class:'arcade-section'},h('div',{class:'section-heading'},h('div',null,h('h2',null,title),h('p',null,subtitle))),h('div',{class:'game-grid'},items.map(card)));}
+ function render(){
+  navs.forEach(([id,b])=>{b.classList.toggle('active',id===view);b.setAttribute('aria-current',id===view?'page':'false');});
+  if(view==='collection')return renderCollection();
+  const filtered=GAMES.filter(g=>(filter==='All'||g.category===filter)&&(mood==='all'||mood==='short'&&g.minutes<=5||mood==='calm'&&g.category!=='Action'||mood==='adventure'&&g.category==='Adventure'));
+  const filters=h('div',{class:'library-filters',role:'group','aria-label':'Filter games'},['All','Puzzle','Strategy','Adventure','Memory','Learn','Action'].map(category=>h('button',{class:'filter-chip'+(filter===category?' active':''),type:'button','aria-pressed':String(filter===category),onclick:()=>{filter=category;render();}},category)));
+  const dailyGames=GAMES.filter(g=>g.id!=='blockfit'),daily=dailyGames[dailySeed('featured')%dailyGames.length];
+  const saved=GAMES.filter(g=>store.loadGame(g.id));
+  const hero=h('section',{class:'arcade-hero'},h('img',{class:'hero-room',src:'assets/arcade-room.webp',alt:'A warm miniature arcade with illuminated cabinets and plants'}),h('div',{class:'hero-scrim'}),h('div',{class:'hero-copy'},h('span',{class:'eyebrow'},'YOUR OFFLINE PLAY SPACE'),h('h1',null,'A little curiosity.',h('br'),h('em',null,'A lot to discover.')),h('p',null,'Ten small worlds for your next spare moment. Find a puzzle, learn a phrase, or head somewhere new.'),h('button',{class:'btn primary',type:'button',onclick:()=>{view='library';filter='All';render();content.scrollTop=0;}},'Explore the games',icon('right',17))),h('span',{class:'room-plaque'},total>=3?'A room that grows with you':'Make yourself at home'),store.pref('arcade','decor',0)>0?h('div',{class:'hero-decoration'},decorationArt(store.pref('arcade','decor',0))):null);
+  const progress=h('div',{class:'week-goal'},h('div',null,h('span',{class:'eyebrow'},'YOUR WEEK, YOUR PACE'),h('h3',null,goal.complete?'Your weekly goal is complete':`${Math.min(goal.count,goal.goal)} of ${goal.goal} sessions`),h('p',null,'Any games you enjoy. Change your goal in Settings.')),h('div',{class:'goal-dots','aria-label':`${goal.count} of ${goal.goal} sessions`},Array.from({length:goal.goal},(_,i)=>h('i',{class:i<goal.count?'done':''}))),h('button',{class:'text-btn',type:'button',onclick:()=>ctx.nav.go('stats')},'View progress →'));
+  const dailyCard=h('div',{class:'daily-card'},h('span',{class:'eyebrow'},'A FRESH CHALLENGE'),h('h3',null,daily.name),h('p',null,'The same starting challenge all day. Beat your own score, at your own pace.'),h('button',{class:'text-btn',type:'button',onclick:()=>launch(daily,'daily')},'Play today’s challenge →'));
+  const moodPicker=h('div',{class:'mood-picker',role:'group','aria-label':'Choose your session'},[['all','Anything goes'],['short','I have five minutes'],['calm','Something relaxed'],['adventure','An adventure']].map(([id,label])=>h('button',{class:'filter-chip'+(mood===id?' active':''),type:'button','aria-pressed':String(mood===id),onclick:()=>{mood=id;render();}},label)));
+  fill(content,view==='arcade'?hero:h('div',{class:'library-title'},h('span',{class:'eyebrow'},'THE COLLECTION'),h('h1',null,'Find your next favorite.'),h('p',null,'Ten games. No accounts, no ads. Everything works offline after installation.')),view==='arcade'?h('div',{class:'arcade-dashboard'},progress,dailyCard):null,saved.length&&view==='arcade'?section('Pick up where you left off','Your saved games are waiting.',saved):null,h('section',{class:'arcade-section'},h('div',{class:'section-heading'},h('div',null,h('h2',null,view==='arcade'?'What are you in the mood for?':'All games'),h('p',null,'Follow your curiosity. Everything is open from the start.'))),moodPicker,filters,h('div',{class:'game-grid'},filtered.map(card)),!filtered.length?h('p',{class:'empty'},'Try another category or session length.'):null),h('footer',{class:'arcade-footer'},h('span',null,'Made for small moments of play.'),h('button',{class:'text-btn',type:'button',onclick:()=>ctx.nav.go('checkin')},'Optional check-in →')));
+ }
+ function renderCollection(){
+  const decor=[['A quiet corner','Your room starts here.',0],['A little greenery','Plants beside the cabinets.',3],['Warm evenings','A brass lamp for the room.',8],['The listening corner','A collection of favorite records.',15],['Under the stars','A tiny constellation above the arcade.',30]];
+  const pick=store.pref('arcade','decor',0);
+  fill(content,h('div',{class:'library-title'},h('span',{class:'eyebrow'},'YOUR LITTLE CORNER'),h('h1',null,'Make room for play.'),h('p',null,`${total} sessions played. Decorations unlock through play; every game stays available.`)),h('div',{class:`collection-room decor-${pick}`},h('img',{src:'assets/arcade-room.webp',alt:'Your miniature arcade room'}),h('div',{class:'room-decoration','aria-label':decor[pick]?.[0]||decor[0][0]},decorationArt(pick)),h('div',{class:'collection-plaque'},decor[pick]?.[0]||decor[0][0])),h('div',{class:'collection-grid'},decor.map(([title,desc,needed],i)=>h('button',{class:'decoration-card'+(pick===i?' selected':''),type:'button',disabled:total<needed?true:null,'aria-pressed':String(pick===i),onclick:()=>{store.setPref('arcade','decor',i);renderCollection();}},h('span',{class:'decor-symbol'},['⌂','❧','◈','♫','✧'][i]),h('b',null,title),h('small',null,total>=needed?desc:`Unlocks at ${needed} sessions`)))),h('section',{class:'arcade-section'},h('h2',null,'Set the mood'),h('div',{class:'library-filters'},['Blue hour','Warm amber','Garden green'].map((name,i)=>h('button',{class:'filter-chip'+(store.pref('arcade','roomstyle',0)===i?' active':''),type:'button',onclick:()=>{store.setPref('arcade','roomstyle',i);el.className=`screen arcade roomstyle-${i}`;renderCollection();}},name)))));
+ }
+ render();return{destroy(){}};
 }
-
-// helpers re-exported for the weekly interstitial
-export { sessionsInWeek, weekStart };

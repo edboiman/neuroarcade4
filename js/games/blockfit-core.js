@@ -1,4 +1,5 @@
-// Block Fit rules engine (pure logic, no DOM). Stack falling shapes, clear rows, adapt to twists.
+// Block Fit rules engine. One game mode, with the original in-run rule changes.
+import { mulberry32 as seeded } from './rng.js';
 export const COLS = 10;
 export const ROWS = 20;
 export const TIME_LIMIT_MS = 180000;
@@ -24,15 +25,7 @@ export const TWIST_TEXT = {
   ccw: 'Reverse spin: rotation direction is flipped',
 };
 
-export function mulberry32(a) {
-  return function () {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+export const mulberry32 = seeded;
 
 const rotCells = (cells, size, dir) => cells.map(([x, y]) => (dir > 0 ? [size - 1 - y, x] : [y, size - 1 - x]));
 

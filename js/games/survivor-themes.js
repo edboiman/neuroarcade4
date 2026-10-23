@@ -1,4 +1,4 @@
-// Holiday Horde skins. Every theme plays the same; only the look and the names change.
+// Holiday Horde skins. Themes share the base rules and have distinct telegraphed seasonal hazards.
 // Emoji are drawn by the phone's own font, so no image files are needed.
 export const THEMES = [
   {

@@ -2,7 +2,8 @@
 import { h, s, icon, fmtNum, fmtDay, fmtTime } from './ui.js';
 import { GAMES } from './registry.js';
 import { store } from './store.js';
-import { rotation, streak, weeklySeries, weekDelta, weekComplete, weekStart, shiftWeek, sessionsInWeek } from './weekly.js';
+import { rotation, streak, weeklySeries, weekDelta, weekComplete, weekStart, shiftWeek, sessionsInWeek, overdue } from './weekly.js';
+import { goalProgress } from './session.js';
 
 // Line chart that breaks at weeks with no data.
 export function lineChart(values, { w = 300, hgt = 90, color = '#4db4ff', pad = 8, label = 'Trend', fillOpacity = 0.14 } = {}) {
@@ -54,12 +55,17 @@ export function mountStats(root, ctx) {
   const rot = rotation(sessions, now);
   const st = streak(sessions, now);
   const total = sessions.length;
+  const goal = goalProgress(store,now);
+  let goalStreak=0, cursor=weekStart(now);
+  if(sessionsInWeek(sessions,cursor).length>=goal.goal)goalStreak++;
+  cursor=shiftWeek(cursor,-1);
+  while(sessionsInWeek(sessions,cursor).length>=goal.goal){goalStreak++;cursor=shiftWeek(cursor,-1);}
 
   const tile = (value, label) => h('div', { class: 'tile' }, h('strong', null, String(value)), h('span', null, label));
   const tiles = h(
     'div',
     { class: 'tiles' },
-    tile(st, st === 1 ? 'week streak' : 'week streak'),
+    tile(goalStreak, 'weeks meeting your goal'),
     tile(GAMES.reduce((n, g) => n + rot.counts[g.id], 0), 'sessions this week'),
     tile(total, 'sessions in total'),
   );
@@ -72,7 +78,7 @@ export function mountStats(root, ctx) {
     { class: 'rot-hist', role: 'img', 'aria-label': 'Rotation history for the last 8 weeks' },
     weeks.map((wk, i) => {
       const cur = i === weeks.length - 1;
-      const done = weekComplete(sessions, wk);
+      const done = sessionsInWeek(sessions,wk).length>=goal.goal;
       const any = sessionsInWeek(sessions, wk).length > 0;
       return h(
         'div',
@@ -85,10 +91,13 @@ export function mountStats(root, ctx) {
 
   // per-game rows
   const rows = GAMES.map((g) => {
-    const series = weeklySeries(sessions, g.id, now, 8);
+    const gameSessions = sessions.filter(x=>x.g===g.id);
+    const latestMode=gameSessions[gameSessions.length-1]?.mode || 'standard';
+    const comparable=gameSessions.filter(x=>(x.mode||'standard')===latestMode);
+    const series = weeklySeries(comparable, g.id, now, 8);
     const cur = series[series.length - 1];
     const d = weekDelta(series);
-    const all = sessions.filter((x) => x.g === g.id);
+    const all = comparable;
     const bestEver = all.reduce((m, x) => Math.max(m, x.s), 0);
     const detail = h('div', { class: 'row-detail', hidden: true });
     const head = h(
@@ -114,7 +123,7 @@ export function mountStats(root, ctx) {
 
   function fillDetail(el, g, series, d, all) {
     el.append(
-      h('div', { class: 'detail-top' }, deltaChip(d), h('span', { class: 'detail-note' }, 'Average score per week, last 8 weeks')),
+      h('div', { class: 'detail-top' }, deltaChip(d), h('span', { class: 'detail-note' }, 'Equivalent rules only · weekly averages, last 8 weeks')),
       lineChart(series.map((w) => w.avg), { w: 320, hgt: 110, pad: 10, color: g.accent, label: g.name + ' weekly average score' }),
       h(
         'table',
@@ -153,7 +162,7 @@ export function mountStats(root, ctx) {
     { class: 'block' },
     h('h2', null, 'Check-in trends'),
     cis.length === 0
-      ? h('p', { class: 'empty' }, 'The Check-in takes about a minute and measures reaction time and short-term memory with tasks the games never train. Do one each week to see real change.')
+      ? h('p', { class: 'empty' }, 'The Check-in takes about a minute and measures reaction time and short-term memory with tasks the games never train. Use it to track performance on these tasks over time.')
       : h(
           'div',
           { class: 'ci-grid' },
@@ -185,7 +194,7 @@ export function mountStats(root, ctx) {
       'div',
       { class: 'page-body' },
       tiles,
-      h('section', { class: 'block' }, h('h2', null, 'Weekly rotation'), hist, h('p', { class: 'fine' }, rot.complete ? 'This week is complete.' : 'Still to play this week: ' + rot.remaining.map((id) => GAMES.find((g) => g.id === id).name).join(', ') + '.')),
+      h('section', { class: 'block' }, h('h2', null, 'Your weekly rhythm'), hist, h('p', { class: 'fine' }, `${goal.count} of ${goal.goal} sessions this week. Any game counts. History uses your current weekly goal.`), store.settings().reminders ? h('p',{class:'fine'},'Something to revisit: '+(overdue(sessions,now).map(x=>GAMES.find(g=>g.id===x.id).name).join(', ')||'Your games are all up to date.')) : null),
       h('section', { class: 'block' }, h('h2', null, 'Games, week over week'), h('div', { class: 'rows' }, rows)),
       checkSection,
     ),

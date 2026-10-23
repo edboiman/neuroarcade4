@@ -1,13 +1,16 @@
 // Deep Delve: canvas UI for dungeon-core.js. Study the map, then cross the dark from memory.
 import * as core from './dungeon-core.js';
-import { h, haptic } from '../ui.js';
+import { h, haptic, icon } from '../ui.js';
+import { saveRun, restore } from '../checkpoint.js';
 import { createDungeonArt } from './dungeon-art.js';
 import { gameTop, hud, overlay } from './common.js';
 
 const { W, H } = core;
 
 export function mount(root, ctx) {
-  const g = core.createGame((Date.now() ^ 0x27d4eb2f) & 0x7fffffff);
+  const saved = ctx.resume ? restore(ctx.store.loadGame('dungeon'), core.validGame) : null;
+  const g = saved ? saved.state : core.createGame(ctx.seed ?? ((Date.now() ^ 0x27d4eb2f) & 0x7fffffff));
+  const save = () => saveRun(ctx.store, 'dungeon', g, { mode: ctx.mode });
   let state = 'ready'; // ready | play | paused | over
   let pauseOv = null;
   let dead = false;
@@ -34,8 +37,19 @@ export function mount(root, ctx) {
   const bar = h('i', { class: 'dd-prevfill' });
   const prev = h('div', { class: 'dd-prev hidden' }, h('span', null, 'Study the map. Spikes are shown for a moment, then hidden.'), h('div', { class: 'dd-prevbar' }, bar), h('button', { class: 'btn primary', type: 'button', onclick: () => stopPreview() }, 'I am ready'));
   const stage = h('div', { class: 'dd-stage' }, canvas, banner);
-  const waitBtn = h('button', { class: 'ctl dd-wait', type: 'button', onclick: () => doWait() }, h('span', null, '⏳'), h('small', null, 'Wait a turn'));
-  const el = h('div', { class: 'dd' }, top, prev, stage, h('div', { class: 'dd-controls' }, waitBtn));
+  const combat = h('div', { class: 'dd-combat', role: 'status', 'aria-live': 'polite' });
+  const control = (label, fn, symbol) => h('button', { class: 'ctl', type: 'button', 'aria-label': label, onclick: fn }, h('span', null, symbol), h('small', null, label));
+  const waitBtn = control('Wait', doWait, '·');
+  const attackBtn = control('Attack', () => {
+    if (state !== 'play' || g.preview) return;
+    const e = core.visibleEnemies(g).find(e => Math.abs(e.x-g.pos.x)+Math.abs(e.y-g.pos.y) === 1);
+    if (!e) return say('Move beside an enemy to attack.');
+    walking++; core.attack(g, e.id); handle(); afterChange();
+  }, '⚔');
+  const guardBtn = control('Defend', () => { if (state !== 'play' || g.preview) return; walking++; core.defend(g); handle(); afterChange(); }, '◇');
+  const scoutBtn = control('Scout', () => { if (state === 'play' && core.scout(g)) { walking++; startPreview(); save(); } }, '◉');
+  const pad = h('div', { class: 'dd-pad', role: 'group', 'aria-label': 'Move through dungeon' }, [[0,-1,'↑'],[-1,0,'←'],[0,1,'↓'],[1,0,'→']].map(([dx,dy,label]) => control(label, () => { if (state === 'play' && !g.preview) { walking++; doStep(dx,dy); } }, label)));
+  const el = h('div', { class: 'dd' }, top, prev, stage, combat, h('div', { class: 'dd-controls' }, attackBtn, guardBtn, waitBtn, scoutBtn), pad);
   root.append(el);
 
   // ----- sprites: drawn once per tile size in dungeon-art.js -----
@@ -101,6 +115,13 @@ export function mount(root, ctx) {
         }
       }
     }
+    // A few persistent visual landmarks aid spatial memory without revealing unknown terrain.
+    for(const q of L.landmarks||[])if(previewing||L.seen[q.y*W+q.x]){
+      const x=(q.x+.5)*tile,y=(q.y+.5)*tile;
+      c2.strokeStyle=['#d7b87c','#7fa7bc','#9fba83'][q.kind];c2.lineWidth=1.5;
+      c2.beginPath();c2.arc(x,y,tile*.23,0,Math.PI*2);c2.stroke();
+      c2.beginPath();c2.moveTo(x-tile*.14,y);c2.lineTo(x+tile*.14,y);c2.moveTo(x,y-tile*.14);c2.lineTo(x,y+tile*.14);c2.stroke();
+    }
     // stairs
     const st = L.stairs;
     if (previewing || L.seen[st.y * W + st.x]) put('stairs', st.x, st.y, 0.96);
@@ -139,6 +160,13 @@ export function mount(root, ctx) {
         c2.ellipse((e.x + 0.5) * tile, (e.y + 0.88) * tile, tile * 0.3, tile * 0.1, 0, 0, 7);
         c2.fill();
         put(e.kind === 'brute' ? 'brute' : 'skeleton', e.x, e.y, e.kind === 'brute' ? 0.98 : 0.9, 0, e.rest ? 0.75 : 1);
+        const ex=(e.x+.5)*tile, ey=e.y*tile;
+        c2.fillStyle='#1c1c29'; c2.fillRect(ex-tile*.3,ey+2,tile*.6,4);
+        c2.fillStyle=e.intent ? '#ef876f' : '#b7c99c'; c2.fillRect(ex-tile*.3,ey+2,tile*.6*e.hp/(e.kind==='brute'?3:2),4);
+        if(e.intent) {
+          c2.strokeStyle='#ffbd8c'; c2.lineWidth=2; c2.strokeRect(e.intent.x*tile+3,e.intent.y*tile+3,tile-6,tile-6);
+          c2.fillStyle='#ffe0aa'; c2.font=`bold ${tile*.55}px sans-serif`; c2.textAlign='center'; c2.fillText('!',ex,ey+tile*.75);
+        }
       }
     }
     // the hero
@@ -155,6 +183,14 @@ export function mount(root, ctx) {
 
   function paintHud() {
     floorHud.set(g.floor);
+    hearts.setAttribute('aria-label', `${g.hp} of ${g.maxHp} health`);
+    const enemies = core.visibleEnemies(g);
+    const danger = enemies.some(e => e.intent);
+    combat.textContent = g.preview ? 'Study the landmarks. Your torch will remember explored ground.' : danger ? 'Attack incoming • defend or step out of the marked tile' : g.riposte ? 'Counter ready • your next attack deals 2 damage' : enemies.length ? 'Tap an adjacent enemy to attack • arrows move • G defends' : `Floor ${g.floor} / ${core.MAX_FLOOR} • find the amber stairs`;
+    combat.classList.toggle('danger', danger);
+    scoutBtn.disabled = g.preview || !g.scouts;
+    attackBtn.disabled = g.preview || !enemies.some(e => Math.abs(e.x-g.pos.x)+Math.abs(e.y-g.pos.y)===1);
+    guardBtn.disabled = g.preview;
     gemHud.set(g.gems);
     hearts.replaceChildren(...Array.from({ length: g.maxHp }, (_, i) => h('span', null, i < g.hp ? '❤️' : '🖤')));
   }
@@ -199,7 +235,10 @@ export function mount(root, ctx) {
         stop = true;
       } else if (e.type === 'maxhp') {
         say('Stronger! +1 heart');
-      } else if (e.type === 'strike') stop = true;
+      } else if (e.type === 'windup') { say('Enemy preparing to strike. Defend or sidestep.'); stop = true; }
+      else if (e.type === 'block') { say('Blocked! Your next attack is a counter.'); ctx.audio.good(); stop = true; }
+      else if (e.type === 'dodge') { say('Attack missed. Your opening!'); stop = true; }
+      else if (e.type === 'strike') stop = true;
     }
     g.events.length = 0;
     return stop;
@@ -207,6 +246,7 @@ export function mount(root, ctx) {
 
   function afterChange() {
     paintHud();
+    if (!g.over) save();
     if (g.over) {
       draw();
       end();
@@ -218,16 +258,19 @@ export function mount(root, ctx) {
 
   // ----- study phase -----
   function startPreview() {
-    state = 'play';
+    state = 'play'; ctx.playing(true);
     previewLeft = core.previewSeconds(g.floor);
     const total = previewLeft;
     prev.classList.remove('hidden');
     bar.style.setProperty('width', '100%');
-    const t0 = performance.now();
+    let lastPreview = performance.now();
     pulseTimer = 0;
     previewTimer = setInterval(() => {
-      if (state === 'paused') return;
-      const left = total - (performance.now() - t0) / 1000;
+      const now = performance.now();
+      const elapsed = Math.min(.25, (now - lastPreview) / 1000); lastPreview = now;
+      if (state !== 'play') return;
+      if (!ctx.practice) previewLeft -= elapsed;
+      const left = previewLeft;
       pulse += 0.5;
       bar.style.setProperty('width', Math.max(0, (left / total) * 100).toFixed(1) + '%');
       draw();
@@ -240,6 +283,7 @@ export function mount(root, ctx) {
     previewTimer = 0;
     core.endPreview(g);
     prev.classList.add('hidden');
+    paintHud(); save();
     draw();
   }
 
@@ -299,7 +343,10 @@ export function mount(root, ctx) {
     if (state !== 'play' || g.preview) return;
     const map = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1], a: [-1, 0], d: [1, 0], w: [0, -1], s: [0, 1] };
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-    if (k === ' ') {
+    if (e.repeat) return;
+    if (k === 'g') { e.preventDefault(); guardBtn.click(); }
+    else if (k === 'f') { e.preventDefault(); attackBtn.click(); }
+    else if (k === ' ') {
       e.preventDefault();
       doWait();
     } else if (map[k]) {
@@ -310,12 +357,25 @@ export function mount(root, ctx) {
   }
   document.addEventListener('keydown', onKey);
 
+  function openCombatLesson(){
+    const t=core.createGame(1);t.preview=false;t.level.tiles=new Uint8Array(W*H).fill(1);t.level.traps=[];t.level.gems=[];t.level.hearts=[];t.pos={x:5,y:7};t.level.enemies=[{id:1,x:6,y:7,kind:'brute',hp:3,cooldown:0,rest:false,intent:null}];
+    core.wait(t);
+    const picture=h('canvas',{'aria-label':'Combat practice arena',width:240,height:100,class:'combat-practice'}),text=h('p',{class:'fine',role:'status','aria-live':'polite'}),actions=h('div',{class:'combat-practice-actions'});
+    function paint(){
+      const pen=picture.getContext('2d');pen.fillStyle='#13262f';pen.fillRect(0,0,240,100);
+      pen.drawImage(art.get('hero',72),45,18,72,72);if(t.level.enemies.length)pen.drawImage(art.get('brute',80),135,14,80,80);
+      const e=t.level.enemies[0];
+      text.textContent=!e?'You did it. Defend the marked attack, then counter for 2 damage.':t.over?'Try the lesson again.':t.riposte?'Blocked. Now attack: your counter deals 2 damage.':e.intent?'The brute is winding up. Defend now or sidestep.':`Your health ${t.hp}/${t.maxHp}. Brute health ${e.hp}/3. Attack while it recovers.`;
+      actions.replaceChildren(...[['Defend',()=>core.defend(t)],['Attack',()=>core.attack(t,1)],['Sidestep',()=>core.move(t,0,-1)]].map(([label,fn])=>h('button',{class:'btn',type:'button',disabled:t.over||!e?true:null,onclick:()=>{fn();t.events=[];paint();}},label)));
+    }
+    paint();overlay(el,{title:'Learn the counterattack',body:h('div',{class:'howto'},h('p',null,'A safe practice encounter. These buttons use the same combat rules as your expedition.'),picture,text,actions),buttons:[{label:'Try again',onclick:openCombatLesson},{label:'Back to expedition',kind:'primary'}]});
+  }
   // ----- flow -----
   function start() {
-    state = 'play';
+    state = 'play'; ctx.playing(true);
     paintHud();
-    startPreview();
-    draw();
+    if (g.preview) startPreview();
+    draw(); save();
   }
   // fade the red damage flash, only while it is visible
   function fadeFlash() {
@@ -331,33 +391,35 @@ export function mount(root, ctx) {
 
   function end() {
     if (state === 'over') return;
-    state = 'over';
+    state = 'over'; ctx.playing(false);
     walking++;
     clearInterval(previewTimer);
+    ctx.store.clearGame('dungeon');
     const win = g.reason === 'escaped';
     ctx.finish({
       score: core.scoreOf(g),
       level: g.floor,
       completed: win || g.floor >= 3,
-      extra: [win ? 'You escaped the depths' : `You fell on floor ${g.floor}`, `Gems: ${g.gems}`, `Monsters beaten: ${g.kills}`, `Floors without a scratch: ${g.perfectFloors}`],
+      extra: [win ? 'You escaped the depths' : `You fell on floor ${g.floor}`, `Gems: ${g.gems}`, `Monsters beaten: ${g.kills}`, `Attacks blocked: ${g.blocks}`, `Traps triggered: ${g.trapsHit}`, 'Next run: defend the marked attack, then counter for double damage', `Floors without a scratch: ${g.perfectFloors}`],
     });
   }
 
   function openPause() {
     if (state !== 'play' || pauseOv) return;
-    state = 'paused';
+    state = 'paused'; ctx.playing(false);
+    save();
     walking++;
     pauseOv = overlay(el, {
       title: 'Paused',
-      body: h('p', null, 'The torch is waiting.'),
+      body: h('div',null,h('p', null, 'The torch is waiting.'),h('button',{class:'btn',type:'button',onclick:openCombatLesson},'Practice combat')),
       buttons: [
-        { label: 'Quit', kind: 'danger', onclick: () => ctx.exit() },
+        { label: 'Save & leave', onclick: () => { save(); ctx.exit(); } },
         {
           label: 'Resume',
           kind: 'primary',
           onclick: () => {
             pauseOv = null;
-            state = 'play';
+            state = 'play'; ctx.playing(true);
           },
         },
       ],
@@ -372,14 +434,16 @@ export function mount(root, ctx) {
     body: h(
       'div',
       { class: 'howto' },
-      h('p', null, 'Find the stairs on every floor. Each floor opens with a short look at the whole map, including the spikes. Then the lights go out.'),
-      h('ul', null, h('li', null, 'Tap a spot you have explored to walk there.'), h('li', null, 'Tap next to a monster to attack it. If you step next to one, it strikes first, so let it come to you and use Wait.'), h('li', null, 'Spikes you forgot cost a heart. Hearts and gems are scattered around.')),
+      h('p', null, 'Find the stairs on every floor. Study the chambers, colored landmarks, and spikes. Your torch remembers explored ground.'),
+      h('button',{class:'btn',type:'button',onclick:openCombatLesson},'Learn combat by playing'),
+      h('ul', null, h('li', null, 'Tap a spot you have explored to walk there.'), h('li', null, 'Tap an adjacent monster or press Attack. Amber marks show its next attack. Defend to block it and charge a double-damage counter, or step out of the marked tile.'), h('li', null, 'Spikes you forgot cost a heart. Hearts and gems are scattered around.')),
     ),
-    buttons: [{ label: 'Enter', kind: 'primary', onclick: start }],
+    buttons: [{ label: saved ? 'Continue expedition' : 'Enter the dungeon', kind: 'primary', onclick: start }],
   });
 
   return {
     destroy() {
+      if (state !== 'ready' && state !== 'over') save();
       dead = true;
       ro.disconnect();
       clearInterval(previewTimer);

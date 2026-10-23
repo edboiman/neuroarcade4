@@ -1,5 +1,7 @@
 // Tycoon Row: board UI for estate-core.js. Rivals move on their own, talk in a chat feed, and wait on you for decisions.
 import * as core from './estate-core.js';
+import { restore, saveRun } from '../checkpoint.js';
+import { validEstate } from '../game-validation.js';
 import { PERSONAS } from './estate-chat.js';
 import { h, s as svgEl, haptic, fill } from '../ui.js';
 import { gameTop, hud, overlay } from './common.js';
@@ -38,6 +40,8 @@ const money = (n) => '$' + n.toLocaleString();
 
 export function mount(root, ctx) {
   const store = ctx.store;
+  const old=ctx.resume?restore(store.loadGame('estate'),validEstate):null;
+  const save=()=>{if(s)saveRun(store,'estate',s,{mode:ctx.mode});};
   let diff = Math.max(1, Math.min(3, Math.round(store.pref('estate', 'diff', 2))));
   let rounds = (() => {
     const r = Math.round(store.pref('estate', 'rounds', core.MAX_ROUNDS));
@@ -47,14 +51,14 @@ export function mount(root, ctx) {
   let dead = false;
   let paused = false;
   let driving = false;
-  let fast = false;
+  let fast = store.pref('estate','fast',1)===1;
   let state = 'ready'; // ready | play | paused | over
   let pauseOv = null;
   let reactReady = true;
 
   const round = hud('Round', '1/' + rounds);
   const worth = hud('Your cash', money(core.START_CASH));
-  const speedBtn = h('button', { class: 'icon-btn es-speed', type: 'button', 'aria-label': 'Speed', onclick: () => ((fast = !fast), (speedBtn.textContent = fast ? '2×' : '1×')) }, '1×');
+  const speedBtn = h('button', { class: 'icon-btn es-speed', type: 'button', 'aria-label': 'Speed', onclick: () => ((fast = !fast), (speedBtn.textContent = fast ? '2×' : '1×'), store.setPref('estate','fast',fast?1:0)) }, fast?'2×':'1×');
   const top = gameTop({ title: 'Tycoon Row', onMenu: () => openPause(), right: h('div', { class: 'hud-row' }, speedBtn, round.el, worth.el) });
 
   const chips = h('div', { class: 'es-players' });
@@ -134,6 +138,8 @@ export function mount(root, ctx) {
       if (tile._lv !== lv) {
         tile._lv = lv;
         fill(tile._pips, lv >= 4 ? h('i', { class: 'hotel' }) : Array.from({ length: lv }, () => h('i', { class: 'house' })));
+        const existing=tile.querySelector('.building-mini');if(existing)existing.remove();
+        if(lv)tile.append(h('span',{class:'building-mini',style:{height:(8+lv*3)+'px'},'aria-hidden':'true'}));
       }
     }
   }
@@ -178,7 +184,9 @@ export function mount(root, ctx) {
     round.set(`${Math.min(s.round, s.maxRounds)}/${s.maxRounds}`);
     worth.set(money(s.players[0].cash));
     for (const q of s.players) if (tokenEls[q.id]) tokenEls[q.id].classList.toggle('turn', q.id === s.turn && !s.over);
-    meta.textContent = `Round ${Math.min(s.round, s.maxRounds)} of ${s.maxRounds}  ·  Picnic pot ${money(s.pot)}`;
+    const ahead = Array.from({length:6},(_,k)=>core.TILES[(s.players[0].pos+k+2)%40]).filter(t=>s.owner[t.i]>=1);
+    meta.textContent = `Net worth ${money(core.netWorth(s,0))} · ${ahead.length} rival deeds in the next 2–7 spaces`;
+    meta.title='Potential rent risk; dice totals vary. Inspect each deed for its rent.';
   }
 
   function showDeeds(pi) {
@@ -415,6 +423,7 @@ export function mount(root, ctx) {
     } finally {
       driving = false;
     }
+    save();
     renderControls();
   }
 
@@ -518,24 +527,27 @@ export function mount(root, ctx) {
 
   // ----- start / end -----
   function setup() {
-    s = core.createGame({ seed: (Date.now() ^ 0x85ebca6b) & 0x7fffffff, difficulty: diff, rounds });
+    s = old ? old.state : core.createGame({ seed: ctx.seed ?? ((Date.now() ^ 0x85ebca6b) & 0x7fffffff), difficulty: diff, rounds });
+    diff=s.diff;rounds=s.maxRounds;
     messages.length = 0;
     paintFeed(null);
-    for (const p of s.players) placeToken(p, 0);
+    for (const p of s.players) placeToken(p, p.pos);
     refreshChips();
     refreshTiles();
-    state = 'play';
-    round.set(`1/${rounds}`);
+    state = 'play'; ctx.playing(true);
+    round.set(`${s.round}/${rounds}`);
+    save();
     say('Welcome to Tycoon Row.');
     drive();
   }
 
   async function finish() {
     if (state === 'over') return;
-    state = 'over';
+    state = 'over'; ctx.playing(false);
     actions.replaceChildren();
     await wait(900);
     if (dead) return;
+    store.clearGame('estate');
     const st = core.standings(s);
     const place = st.findIndex((x) => x.id === 0);
     const score = core.netWorth(s, 0) + [1500, 800, 300, 0][place];
@@ -545,6 +557,7 @@ export function mount(root, ctx) {
       score,
       level: diff,
       completed: true,
+      variant: `rivals${diff}_rounds${rounds}`,
       extra: [`You finished ${['1st', '2nd', '3rd', '4th'][place]} of 4`, ...st.map((x, k) => `${k + 1}. ${x.name}: ${x.bankrupt ? 'bankrupt' : money(x.worth)}`), won && diff < 3 ? 'Your rivals will play tougher next time' : `Rivals: ${['Easy', 'Normal', 'Hard'][diff - 1]}`],
     });
   }
@@ -552,17 +565,20 @@ export function mount(root, ctx) {
   function openPause() {
     if (state !== 'play' || pauseOv) return;
     paused = true;
+    state = 'paused'; ctx.playing(false);
+    save();
     pauseOv = overlay(el, {
       title: 'Paused',
       body: h('p', null, 'The game is on hold.'),
       buttons: [
-        { label: 'Quit game', kind: 'danger', onclick: () => ctx.exit() },
+        { label: 'Save & leave', onclick: () => {save();ctx.exit();} },
         {
           label: 'Resume',
           kind: 'primary',
           onclick: () => {
             pauseOv = null;
             paused = false;
+            state = 'play'; ctx.playing(true);
           },
         },
       ],
@@ -589,10 +605,11 @@ export function mount(root, ctx) {
     paint();
     overlay(el, { title: 'Tycoon Row', body, buttons: [{ label: 'Deal me in', kind: 'primary', onclick: setup }] });
   }
-  showReady();
+  if(old)overlay(el,{title:'Your town is waiting',body:h('p',null,`Continue round ${old.state.round} with your deeds and cash intact.`),buttons:[{label:'Continue game',kind:'primary',onclick:setup}]});else showReady();
 
   return {
     destroy() {
+      if(s && state!=='over')save();
       dead = true;
     },
     pause: openPause,

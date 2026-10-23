@@ -19,6 +19,9 @@ export function hud(label, initial = '0') {
 
 // buttons: [{label, kind, onclick}]. Returns {el, close}.
 export function overlay(parent, { title, body, buttons }) {
+  const previousFocus = document.activeElement;
+  let closed = false;
+  const close = () => { if(closed)return;closed=true;el.remove();if(previousFocus?.isConnected)previousFocus.focus({preventScroll:true}); };
   const el = h(
     'div',
     { class: 'game-overlay', role: 'dialog', 'aria-modal': 'true', 'aria-label': title },
@@ -37,7 +40,7 @@ export function overlay(parent, { title, body, buttons }) {
               class: 'btn ' + (b.kind || ''),
               type: 'button',
               onclick: () => {
-                if (b.close !== false) el.remove();
+                if (b.close !== false) close();
                 b.onclick && b.onclick();
               },
             },
@@ -47,10 +50,11 @@ export function overlay(parent, { title, body, buttons }) {
       ),
     ),
   );
+  el.addEventListener('keydown',e=>{if(e.key!=='Tab')return;const buttons=[...el.querySelectorAll('button:not(:disabled),[tabindex="0"]')];if(!buttons.length)return;const first=buttons[0],last=buttons[buttons.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}});
   parent.append(el);
   const first = el.querySelector('button:last-child');
   if (first) first.focus({ preventScroll: true });
-  return { el, close: () => el.remove() };
+  return { el, close };
 }
 
 export const mmss = (ms) => {

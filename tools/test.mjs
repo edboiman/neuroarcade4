@@ -47,8 +47,8 @@ test('rotation counts plays and never locks a game', () => {
   const r = weekly.rotation(s, now);
   assert.equal(r.counts.blockfit, 4);
   assert.equal('locked' in r, false);
-  assert.deepEqual(r.remaining, ['cafe', 'survivor', 'estate', 'dungeon']);
-  for (const g of ['cafe', 'survivor', 'estate', 'dungeon']) s.push(mk(g, base + 5000));
+  assert.deepEqual(r.remaining, weekly.GAME_IDS.filter(id=>id!=='blockfit'));
+  for (const g of weekly.GAME_IDS.filter(id=>id!=='blockfit')) s.push(mk(g, base + 5000));
   assert.equal(weekly.rotation(s, now).complete, true);
 });
 
@@ -845,7 +845,8 @@ test('Scenarios: shifts only use their own words, words carry over between scena
     return sh.slots.find(Boolean).max;
   };
   assert.ok(patience('relaxed') > patience('normal') && patience('normal') > patience('rush'));
-  assert.equal(PACES.length, 3);
+  assert.equal(PACES.length, 4);
+  assert.ok(PACES.some(p=>p.id==='practice'));
   assert.equal(sceneById('nope').id, 'cafe', 'unknown scenario ids fall back safely');
 });
 

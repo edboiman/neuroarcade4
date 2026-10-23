@@ -1,5 +1,7 @@
 // Holiday Horde: canvas UI for the engine in survivor-core.js.
 import * as core from './survivor-core.js';
+import { restore, saveRun } from '../checkpoint.js';
+import { validHorde } from '../game-validation.js';
 import { THEMES, themeForDate } from './survivor-themes.js';
 import { h, haptic, fill } from '../ui.js';
 import { createLoop } from '../loop.js';
@@ -16,7 +18,13 @@ export function mount(root, ctx) {
   const activeTheme = () => (themeIdx >= 0 ? THEMES[themeIdx] : themeForDate(new Date()));
   let theme = activeTheme();
   let manual = store.pref('survivor', 'aim', 0) === 1;
-  let run = core.createRun((Date.now() ^ 0x5bd1e995) & 0x7fffffff);
+  const old=ctx.resume?restore(store.loadGame('survivor'),validHorde):null;
+  let run = old ? old.state : core.createRun(ctx.seed ?? ((Date.now() ^ 0x5bd1e995) & 0x7fffffff));
+  let classIdx=old?.meta?.heroClass??Math.max(0,Math.min(2,Math.round(store.pref('survivor','heroClass',0))));
+  if(![0,1,2].includes(classIdx))classIdx=0;
+  if(old && Number.isInteger(old.meta.theme) && old.meta.theme>=-1 && old.meta.theme<THEMES.length){themeIdx=old.meta.theme;theme=activeTheme();}
+  const save=()=>saveRun(store,'survivor',run,{heroClass:classIdx,theme:themeIdx,mode:ctx.mode});
+  let savedAt=0;
   let state = 'ready'; // ready | play | choose | paused | over
   let pauseOv = null;
   let cssW = 360;
@@ -164,7 +172,14 @@ export function mount(root, ctx) {
         if (v % 100 < 55) paint('prop', 14 + ((v >>> 4) % 12), gx * cell + ((v >>> 12) % cell), gy * cell + ((v >>> 20) % cell), false, 0.55, (v >>> 8) % 3);
       }
     }
-    const now = performance.now() / 1000;
+    const now = ctx.settings.reduce ? 0 : performance.now() / 1000;
+    for(const z of run.hazards||[]){
+      const active=z.t>=z.windup;
+      c2.beginPath();c2.arc(z.x,z.y,z.r,0,Math.PI*2);
+      c2.fillStyle=active?'rgba(238,157,103,.35)':'rgba(238,184,116,.09)';c2.fill();
+      c2.strokeStyle=active?'#ffe2ac':'#dfbb86';c2.lineWidth=active?3:1.5;c2.setLineDash(active?[]:[6,5]);c2.stroke();c2.setLineDash([]);
+      c2.beginPath();c2.arc(z.x,z.y,z.r*Math.min(1,z.t/z.windup),0,Math.PI*2);c2.strokeStyle='#dfbb8670';c2.stroke();
+    }
     // gems: a slow bob so they read as pickups
     for (const g of run.gems) paint('gem', g.v > 3 ? 20 : 14, g.x, g.y + Math.sin(now * 5 + g.x) * 1.5);
     // guardians
@@ -268,8 +283,8 @@ export function mount(root, ctx) {
     // walk cycle: a little bounce and a lean into the direction of travel
     const mv = inputVec();
     const moving = Math.hypot(mv.x, mv.y) > 0.1 && state === 'play';
-    walkT += moving ? 1 / 30 : 0;
-    const bounce = moving ? Math.abs(Math.sin(walkT * 11)) * 3 : Math.sin(now * 2) * 0.8;
+    walkT = run.t;
+    const bounce = ctx.settings.reduce ? 0 : moving ? Math.abs(Math.sin(walkT * 11)) * 3 : Math.sin(now * 2) * 0.8;
     c2.save();
     c2.translate(hero.x, hero.y - 3 - bounce);
     c2.rotate(moving ? Math.max(-0.12, Math.min(0.12, mv.x * 0.12)) : 0);
@@ -391,6 +406,7 @@ export function mount(root, ctx) {
   // ----- events from the engine -----
   function handleEvents(now) {
     for (const e of run.events) {
+      if(e.type==='hazard')say(`${e.name}: leave the marked circle`,2400);
       if (e.type === 'kill') {
         if (fx.length < 50) {
           const n = e.kind === 'boss' ? 16 : e.elite ? 10 : 6;
@@ -486,6 +502,7 @@ export function mount(root, ctx) {
       if (hurtTimer <= 0) wrap.classList.remove('hurt');
     }
     draw();
+    if(run.t-savedAt>=5){savedAt=run.t;save();}
     time.set(mmss((core.RUN_SECONDS - run.t) * 1000));
     level.set(run.level);
     kills.set(run.kills);
@@ -502,12 +519,12 @@ export function mount(root, ctx) {
     if (run.milestone > 0) chooseMilestone();
     else if (run.pending > 0) chooseUpgrade();
     else {
-      state = 'play';
+      state = 'play'; ctx.playing(true);
       loop.start();
     }
   }
   function chooseMilestone() {
-    state = 'choose';
+    state = 'choose'; ctx.playing(false);
     loop.stop();
     release();
     draw();
@@ -548,7 +565,7 @@ export function mount(root, ctx) {
     return h('p', { class: 'up-build' }, all.length ? ['Your build: ', all.join('  ·  ')] : 'No upgrades yet.');
   }
   function chooseUpgrade(choices) {
-    state = 'choose';
+    state = 'choose'; ctx.playing(false);
     loop.stop();
     release();
     draw();
@@ -585,43 +602,55 @@ export function mount(root, ctx) {
   function start() {
     theme = activeTheme();
     manual = store.pref('survivor', 'aim', 0) === 1;
-    run.manual = manual;
+    run.manual = old ? run.manual : manual;
+    if(!old){
+      run.heroClass=classIdx;
+      if(classIdx===0){run.up.power=1;run.up.rate=1;}
+      if(classIdx===1){run.hero.maxHp=150;run.hero.hp=150;run.ms.shield=1;run.shieldCharges=1;}
+      if(classIdx===2){run.up.speed=1;run.up.magnet=1;}
+      run.practice=!!ctx.practice;run.season=activeTheme().id;
+    }
+    manual=run.manual;
     updateView();
-    state = 'play';
+    state = 'play'; ctx.playing(true);
     sprites.clear();
     loop.start();
-    say(theme.tagline, 2600);
+    say(`${theme.tagline} ${core.SEASON_RULES[theme.id].name}: watch for marked circles.`, 3200);
+    save();
   }
   function end() {
     if (state === 'over') return;
-    state = 'over';
+    state = 'over'; ctx.playing(false);
     loop.stop();
     release();
     draw();
+    store.clearGame('survivor');
     const win = run.reason === 'dawn';
     ctx.finish({
       score: core.scoreOf(run),
       level: run.level,
       completed: win || run.t >= 60,
+      variant: `class${classIdx}_${manual?'manual':'auto'}_${theme.id}`,
       extra: [win ? 'You survived until dawn' : `You lasted ${mmss(run.t * 1000)}`, `Defeated: ${run.kills}`, `Theme: ${theme.name}`],
     });
   }
   function openPause() {
     if (state !== 'play' || pauseOv) return;
-    state = 'paused';
+    state = 'paused'; ctx.playing(false);
+    save();
     loop.stop();
     release();
     pauseOv = overlay(el, {
       title: 'Paused',
       body: h('div', null, h('p', null, 'The horde is waiting.'), buildLine()),
       buttons: [
-        { label: 'Quit run', kind: 'danger', onclick: () => ctx.exit() },
+        { label: 'Save & leave', onclick: () => {save();ctx.exit();} },
         {
           label: 'Resume',
           kind: 'primary',
           onclick: () => {
             pauseOv = null;
-            state = 'play';
+            state = 'play'; ctx.playing(true);
             loop.start();
           },
         },
@@ -727,6 +756,8 @@ export function mount(root, ctx) {
         { class: 'howto' },
         h('p', null, 'Survive four minutes. Dodge the horde, collect gems, and build your weapon. Choose how you aim below.'),
         h('ul', null, h('li', null, 'Collect the gems that fall to level up, then pick an upgrade. Build toward a style: shooting, guarding or moving.'), h('li', null, 'Swarms and bosses arrive as time goes on. Keep moving.')),
+        h('strong',{class:'es-len-h'},'Choose your starting build'),
+        h('div',{class:'class-picker',role:'group','aria-label':'Hero class'},[['Ranger','Powerful, faster starting shots.'],['Warden','150 health and a protective barrier.'],['Wayfinder','Faster movement and wider gem pickup.']].map(([name,desc],i)=>h('button',{class:'class-card'+(classIdx===i?' on':''),type:'button','aria-pressed':String(classIdx===i),onclick:e=>{classIdx=i;store.setPref('survivor','heroClass',i);for(const b of e.currentTarget.parentElement.children){b.classList.toggle('on',b===e.currentTarget);b.setAttribute('aria-pressed',String(b===e.currentTarget));}}},name,h('small',null,desc)))),
         ctl,
         ctlDesc,
         chips,
@@ -735,10 +766,11 @@ export function mount(root, ctx) {
       buttons: [{ label: 'Start', kind: 'primary', onclick: start }],
     });
   }
-  showReady();
+  if(old)overlay(el,{title:'Continue your expedition',body:h('p',null,`Level ${run.level}. Your build and enemies are saved.`),buttons:[{label:'Continue run',kind:'primary',onclick:()=>{start();nextChoice();}}]});else showReady();
 
   return {
     destroy() {
+      if(state!=='ready'&&state!=='over')save();
       loop.destroy();
       ro.disconnect();
       clearTimeout(bannerTimer);

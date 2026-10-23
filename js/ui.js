@@ -125,6 +125,7 @@ export function modal({ title, body, actions, dismissible = true }) {
       resolve(v);
     };
     const onKey = (e) => {
+      if(e.key==='Tab'){const first=btns[0],last=btns[btns.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}
       if (e.key === 'Escape' && dismissible) {
         e.stopPropagation();
         close(null);

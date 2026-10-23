@@ -93,6 +93,7 @@ export function createRun(seed = 1, { manual = false } = {}) {
     pet: null,
     shieldCd: 0,
     shieldCharges: 0,
+    hazards: [], hazardNext: 25,
   };
 }
 
@@ -241,7 +242,7 @@ export function step(run, dt, input, aim) {
     if (!arr) grid.set(k, (arr = []));
     arr.push(i);
   }
-  const sc = speedScale(run.t);
+  const sc = speedScale(run.t) * (run.practice ? .78 : 1);
   for (const e of run.enemies) {
     const def = ENEMY[e.kind];
     const dx = h.x - e.x;
@@ -293,7 +294,7 @@ export function step(run, dt, input, aim) {
           run.events.push({ type: 'block' });
           break;
         }
-        const dmg = def.dmg * (e.elite ? 1.5 : 1);
+        const dmg = def.dmg * (e.elite ? 1.5 : 1) * (run.practice ? .5 : 1);
         h.hp -= dmg;
         run.hurtTotal += dmg;
         run.events.push({ type: 'hurt' });
@@ -301,6 +302,8 @@ export function step(run, dt, input, aim) {
       }
     }
   }
+
+  seasonalStep(run, dt);
 
   // barrier recharge
   if (run.ms.shield > 0 && run.shieldCharges < run.ms.shield) {
@@ -624,4 +627,31 @@ function gainXp(run, v) {
 export function scoreOf(run) {
   const win = run.reason === 'dawn';
   return Math.round(run.kills * 10 + Math.floor(run.t) * 5 + (run.level - 1) * 100 + (win ? 1000 + run.hero.hp * 5 : 0));
+}
+
+export const SEASON_RULES = {
+ halloween: { name: 'Haunted ground', radius: 46, windup: 2.2, damage: 9 },
+ harvest: { name: 'Falling branches', radius: 35, windup: 2, damage: 8 },
+ winter: { name: 'Icefall', radius: 58, windup: 2.6, damage: 10 },
+ valentine: { name: 'Thorn bloom', radius: 42, windup: 2.2, damage: 8 },
+ spring: { name: 'Spore cloud', radius: 66, windup: 2.8, damage: 7 },
+ summer: { name: 'High tide', radius: 72, windup: 3, damage: 8 },
+};
+export function seasonalStep(run, dt) {
+ const rule=SEASON_RULES[run.season];if(!rule)return;
+ run.hazards ||= [];
+ if(run.t>=run.hazardNext){
+  run.hazardNext=run.t+14;
+  run.hazards.push({x:run.hero.x+(run.rnd()-.5)*90,y:run.hero.y+(run.rnd()-.5)*90,r:rule.radius,t:0,windup:rule.windup,hit:false});
+  run.events.push({type:'hazard',name:rule.name});
+ }
+ for(const z of run.hazards){
+  z.t+=dt;
+  if(z.t>=z.windup&&!z.hit&&Math.hypot(run.hero.x-z.x,run.hero.y-z.y)<z.r&&run.hero.iframe<=0){
+   z.hit=true;run.hero.iframe=.8;
+   if(run.shieldCharges>0){run.shieldCharges--;run.events.push({type:'block'});}
+   else{const dmg=rule.damage*(run.practice?.5:1);run.hero.hp-=dmg;run.hurtTotal+=dmg;run.events.push({type:'hurt'});}
+  }
+ }
+ run.hazards=run.hazards.filter(z=>z.t<z.windup+.7);
 }

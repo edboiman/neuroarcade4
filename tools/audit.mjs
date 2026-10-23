@@ -69,7 +69,7 @@ if (/\sstyle\s*=/i.test(html.replace(/<noscript>[\s\S]*?<\/noscript>/i, ''))) fa
 // Offline file list must match what ships
 const sw = read('sw.js');
 const listed = [...sw.matchAll(/'\.\/([^']*)'/g)].map((m) => m[1]).filter(Boolean).sort();
-const actual = appFiles().sort();
+const actual = [...appFiles(), 'js/version.js'].sort();
 for (const f of actual) if (!listed.includes(f)) fail(`sw.js precache is missing ${f} (run: node tools/build.mjs)`);
 for (const f of listed) if (!actual.includes(f)) fail(`sw.js precache lists a missing file ${f}`);
 const ver = read('js/version.js').match(/'([0-9a-f]{10})'/);

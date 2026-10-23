@@ -7,9 +7,15 @@ import { h, haptic, fill } from '../ui.js';
 import { createLoop } from '../loop.js';
 import { gameTop, hud, overlay } from './common.js';
 import { runLesson } from './cafe-lesson.js';
+import { itemArt } from './item-art.js';
+import { scheduleReview, reviewOrder } from '../reviews.js';
+import { restore, saveRun } from '../checkpoint.js';
+import { speakLocal, stopSpeech } from '../speech.js';
+import { sentence, englishLine } from './cafe-data.js';
 
 export function mount(root, ctx) {
   const store = ctx.store;
+  function validShift(g) { return LANGS.some(l=>l.id===g.lang) && SCENES.some(sc=>sc.id===g.scene) && typeof g.rnd==='function' && g.pace && PACES.some(p=>p.id===g.pace.id) && Array.isArray(g.tray) && g.tray.length<=12 && g.tray.every(id=>itemById(id)) && Array.isArray(g.slots) && g.slots.length===4 && g.slots.every(c=>!c||(['waiting','served','left'].includes(c.state)&&Number.isInteger(c.slot)&&c.slot>=0&&c.slot<4&&Array.isArray(c.order)&&c.order.length<=4&&c.order.every(o=>itemById(o.id)&&Number.isInteger(o.qty)&&o.qty>0&&o.qty<=3)&&Array.isArray(c.plate)&&c.plate.length<=12&&c.plate.every(id=>itemById(id)))) && g.box && g.stats && g.hearts>0 && g.hearts<=5 && Number.isInteger(g.shift) && g.shift>=1; }
   let langIdx = Math.round(store.pref('cafe', 'lang', 0));
   if (langIdx < 0 || langIdx >= LANGS.length) langIdx = 0;
   const prefIdx = (key, n, def) => {
@@ -17,7 +23,10 @@ export function mount(root, ctx) {
     return v >= 0 && v < n ? v : def;
   };
   let sceneIdx = prefIdx('scene', SCENES.length, 0);
-  let paceIdx = prefIdx('pace', PACES.length, 1);
+  let paceIdx = ctx.practice ? 3 : prefIdx('pace', PACES.length, 1);
+  const old = ctx.resume ? restore(store.loadGame('cafe'), validShift) : null;
+  if (old) {langIdx=LANGS.findIndex(l=>l.id===old.state.lang);sceneIdx=SCENES.findIndex(sc=>sc.id===old.state.scene);paceIdx=PACES.findIndex(p=>p.id===old.state.pace.id);}
+  const save = () => { if (s) saveRun(store,'cafe',s,{lang:langIdx,scene:sceneIdx,pace:paceIdx,mode:ctx.mode}); };
   let s = null; // the shift in progress
   let state = 'ready'; // ready | play | paused | over
   let pauseOv = null;
@@ -74,7 +83,7 @@ export function mount(root, ctx) {
         return h(
           'button',
           { class: 'cf-item', type: 'button', 'aria-label': x[lang().id].noun, onpointerdown: (e) => (e.preventDefault(), tap(id)) },
-          h('span', { class: 'cf-emoji' }, x.emoji),
+          h('span', { class: 'cf-emoji' }, itemArt(id)),
           h('small', { class: showWord(id) ? '' : 'veil' }, showWord(id) ? x[lang().id].noun : '·'),
         );
       }),
@@ -208,6 +217,7 @@ export function mount(root, ctx) {
 
   // ----- loop at 10 fps: DOM only, very light -----
   let lastFloorSig = '';
+  let lastSaved = 0;
   function frame(dt) {
     if (state !== 'play') return;
     core.tick(s, dt);
@@ -222,13 +232,14 @@ export function mount(root, ctx) {
       renderFloor();
     } else paintPatience();
     renderStatus();
+    if (s.t - (s._savedAt || 0) > 5) {s._savedAt=s.t;save();}
     if (s.over) end();
   }
   const loop = createLoop(frame, () => 10);
 
   function start(featured) {
     const sk = skill();
-    s = core.createShift({ lang: lang().id, box: sk.box, shift: shiftNo(), seed: (Date.now() ^ 0x9e3779b1) & 0x7fffffff, featured, scene: scene().id, pace: PACES[paceIdx].id });
+    s = old && state === 'ready' ? old.state : core.createShift({ lang: lang().id, box: sk.box, reviews: sk.reviews, shift: shiftNo(), seed: ctx.seed ?? ((Date.now() ^ 0x9e3779b1) & 0x7fffffff), featured, scene: scene().id, pace: PACES[paceIdx].id });
     avatars.clear();
     dress();
     correction = null;
@@ -237,7 +248,7 @@ export function mount(root, ctx) {
     assistBtn.classList.remove('on');
     assistBtn.setAttribute('aria-pressed', 'false');
     assistBtn.textContent = 'Show words';
-    state = 'play';
+    state = 'play'; ctx.playing(true);
     renderHearts();
     renderTray();
     renderFloor();
@@ -247,11 +258,14 @@ export function mount(root, ctx) {
 
   function end() {
     if (state === 'over') return;
-    state = 'over';
+    state = 'over'; ctx.playing(false);
     loop.stop();
     // save what was learned
     const sk = skill();
     sk.box = { ...s.box };
+    sk.reviews ||= {};
+    for (const [id, stats] of Object.entries(s.stats)) sk.reviews[id] = scheduleReview(sk.reviews[id], stats.miss===0 && stats.hit>0);
+    store.clearGame('cafe');
     store.saveSkills();
     const done = s.reason === 'done';
     if (done) store.setPref('cafe', shiftKey(), shiftNo());
@@ -268,24 +282,25 @@ export function mount(root, ctx) {
     ];
     if (tricky.length) extra.push('Practice: ' + tricky.map((w) => itemById(w.id).emoji + ' ' + itemById(w.id)[lang().id].noun).join(', '));
     extra.push(`Phrase to keep: ${phrase[0]} = ${phrase[1]}`);
-    ctx.finish({ score: core.scoreOf(s), level: shiftNo(), accuracy: s.resolved ? s.served / s.resolved : null, completed: done, extra });
+    ctx.finish({ score: core.scoreOf(s), level: shiftNo(), accuracy: s.resolved ? s.served / s.resolved : null, completed: done, variant: `${s.lang}_${s.scene}_${s.pace.id}`, extra });
   }
 
   function openPause() {
     if (state !== 'play' || pauseOv) return;
-    state = 'paused';
+    state = 'paused'; ctx.playing(false);
+    save();
     loop.stop();
     pauseOv = overlay(el, {
       title: 'Paused',
       body: h('p', null, 'Customers wait while you pause.'),
       buttons: [
-        { label: 'Quit shift', kind: 'danger', onclick: () => ctx.exit() },
+        { label: 'Save & leave', onclick: () => {save();ctx.exit();} },
         {
           label: 'Resume',
           kind: 'primary',
           onclick: () => {
             pauseOv = null;
-            state = 'play';
+            state = 'play'; ctx.playing(true);
             loop.start();
           },
         },
@@ -297,7 +312,7 @@ export function mount(root, ctx) {
   let lesson = null;
   let readyOv = null;
   function beginLesson(ids, teach) {
-    state = 'lesson';
+    state = 'lesson'; ctx.playing(false);
     lesson = runLesson({
       root: el,
       lang: lang(),
@@ -314,6 +329,8 @@ export function mount(root, ctx) {
           if (teach) sk.box[id] = res.skipped ? 2 : res.missed.includes(id) ? 0 : 1;
           else sk.box[id] = Math.max(0, Math.min(core.MAX_BOX, (sk.box[id] ?? 0) + (res.missed.includes(id) ? -1 : 1)));
         }
+        sk.reviews ||= {};
+        for (const id of ids) sk.reviews[id]=scheduleReview(sk.reviews[id], !res.missed.includes(id));
         store.saveSkills();
         if (teach) start(ids);
         else {
@@ -398,22 +415,20 @@ export function mount(root, ctx) {
               'div',
               { class: 'cf-new' },
               h('strong', null, 'Step 1: learn these'),
-              h('ul', null, fresh.map((id) => h('li', null, h('span', { class: 'cf-emoji sm' }, itemById(id).emoji), h('b', { lang: l.id }, itemById(id)[l.id].noun), h('small', null, itemById(id).en)))),
+              h('ul', null, fresh.map((id) => h('li', null, h('span', { class: 'cf-emoji sm' }, itemArt(id)), h('b', { lang: l.id }, itemById(id)[l.id].noun), h('small', null, itemById(id).en)))),
               h('strong', { class: 'cf-step2' }, `Step 2: help the ${sc.people}`),
             )
           : h('p', null, `You have met every ${sc.name.toLowerCase()} word. Time to sharpen them.`),
         core.quantitiesOn(n) ? h('p', { class: 'cf-nums' }, `Numbers: ${NUMS[l.id][2]} = 2, ${NUMS[l.id][3]} = 3`) : null,
         knownHere >= 4 ? h('button', { class: 'btn cf-review', type: 'button', onclick: () => review() }, 'Quick review of words you have met here') : null,
-        h('p', { class: 'fine' }, 'Words you miss come back sooner, in every scenario that uses them.'),
+        h('p', { class: 'fine' }, `${sc.items.filter(id=>id in skill().box && (skill().reviews?.[id]?.due||0)<=Date.now()).length} words due for review. Successful reviews return after 1, 3, 6, 13 days and longer; missed words return in 10 minutes.`),
+        h('button', {class:'btn',type:'button',onclick:()=>conversation()}, 'Practice a conversation'),
       );
       startBtn.textContent = fresh.length ? 'Start lesson' : `Start the ${sc.people === 'customers' ? 'rush' : 'shift'}`;
     }
     function review() {
       const sk = skill();
-      const weakest = scene()
-        .items.filter((id) => id in sk.box)
-        .sort((x, y) => sk.box[x] - sk.box[y])
-        .slice(0, 6);
+      const weakest = reviewOrder(scene().items.filter(id=>id in sk.box), sk.box, sk.reviews).slice(0,6);
       readyOv.close();
       beginLesson(weakest, false);
     }
@@ -435,10 +450,20 @@ export function mount(root, ctx) {
     const startBtn = readyOv.el.querySelector('.go-actions .btn');
     paint();
   }
-  showReady();
+  function conversation() {
+    const l=lang().id, sc=scene(), ids=sc.items.slice(0,6);
+    const target=ids[Math.floor(Math.random()*ids.length)], order=[{id:target,qty:1}];
+    const line=sentence(l,order,0,sc.id);
+    const answer=h('p',{class:'fine'},'Read the request, then choose what the person needs.');
+    const body=h('div',{class:'howto'},h('p',{lang:l},line),h('button',{class:'btn',type:'button',onclick:()=>{if(!ctx.store.settings().sound || !speakLocal(line,l))answer.textContent='No installed offline voice for this language. Read the request above or install a system voice.';}},'Listen with offline voice'),h('div',{class:'theme-chips'},ids.map(id=>h('button',{class:'theme-chip',type:'button',onclick:e=>{const correct=id===target;answer.textContent=correct?`Correct. ${englishLine(order,0,sc.id)}`:'That is a different item. Read the request again.';e.currentTarget.classList.toggle('on',correct);if(correct){ctx.audio.good();const sk=skill();sk.reviews||={};sk.reviews[id]=scheduleReview(sk.reviews[id],true);store.saveSkills();}}},itemArt(id)))),answer);
+    overlay(el,{title:'A short conversation',body,buttons:[{label:'Another request',onclick:conversation},{label:'Back',kind:'primary'}]});
+  }
+  if(old) overlay(el,{title:'Continue your shift',body:h('p',null,'Your customers and plate are just where you left them.'),buttons:[{label:'Continue',kind:'primary',onclick:()=>start(null)}]}); else showReady();
 
   return {
     destroy() {
+      if (state==='play'||state==='paused') save();
+      stopSpeech();
       if (lesson) lesson.destroy();
       loop.destroy();
       clearTimeout(noteTimer);

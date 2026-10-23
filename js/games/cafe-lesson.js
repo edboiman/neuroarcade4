@@ -4,6 +4,7 @@ import { ITEMS, itemById, sentence, englishLine, NUMS } from './cafe-data.js';
 import { sceneById } from './lingo-scenes.js';
 import { h, haptic, fill } from '../ui.js';
 import { mulberry32, shuffle } from './rng.js';
+import { itemArt } from './item-art.js';
 
 // Builds the quiz questions: every word once picture-to-word and once word-to-picture, mixed.
 export function buildQuiz(ids, rnd) {
@@ -70,7 +71,7 @@ export function runLesson({ root, lang, ids, teach, shift, ctx, onDone, scene = 
       body = h(
         'div',
         { class: 'cl-card' },
-        h('div', { class: 'cl-emoji' }, x.emoji),
+        h('div', { class: 'cl-emoji' }, itemArt(c.id)),
         h('div', { class: 'cl-word', lang: L }, x[L].noun),
         h('div', { class: 'cl-en' }, x.en),
         h('div', { class: 'cl-ex' }, h('span', { lang: L }, `“${ex}”`), h('small', null, englishLine([{ id: c.id, qty: 1 }], 0, sc.id))),
@@ -111,7 +112,7 @@ export function runLesson({ root, lang, ids, teach, shift, ctx, onDone, scene = 
     const x = itemById(q.id);
     const opts = choicesFor(q.id, ids, rnd, 4, sc.items);
     const prompt =
-      q.dir === 'word2pic' ? h('div', { class: 'cl-prompt', lang: L }, x[L].noun) : h('div', { class: 'cl-prompt big' }, x.emoji);
+      q.dir === 'word2pic' ? h('div', { class: 'cl-prompt', lang: L }, x[L].noun) : h('div', { class: 'cl-prompt big', role:'img', 'aria-label':x.en }, itemArt(q.id));
     const hint = q.dir === 'word2pic' ? 'Which one is it?' : 'What is this called?';
     const grid = h(
       'div',
@@ -120,8 +121,8 @@ export function runLesson({ root, lang, ids, teach, shift, ctx, onDone, scene = 
         const o = itemById(id);
         const b = h(
           'button',
-          { class: 'cl-opt' + (q.dir === 'word2pic' ? ' pic' : ''), type: 'button', lang: q.dir === 'word2pic' ? null : L, onclick: () => answer(q, id, b, grid) },
-          q.dir === 'word2pic' ? o.emoji : o[L].noun,
+          { class: 'cl-opt' + (q.dir === 'word2pic' ? ' pic' : ''), type: 'button', 'aria-label':q.dir==='word2pic'?o.en:o[L].noun, lang: q.dir === 'word2pic' ? null : L, onclick: () => answer(q, id, b, grid) },
+          q.dir === 'word2pic' ? itemArt(id) : o[L].noun,
         );
         b.dataset.id = id;
         return b;

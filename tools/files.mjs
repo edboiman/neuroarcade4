@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 export const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SKIP_DIRS = new Set(['.git', '.github', 'tools', 'node_modules']);
-const SKIP_FILES = new Set(['sw.js', 'js/version.js', 'README.md', 'SECURITY.md', 'package.json', '.nojekyll', '.gitignore', 'LICENSE', 'CLAUDE.md', 'fonts/OFL.txt']);
+const SKIP_FILES = new Set(['sw.js', 'js/version.js', 'README.md', 'SECURITY.md', 'package.json', '.nojekyll', '.gitignore', 'LICENSE', 'CLAUDE.md', 'RELEASE_NOTES.md', 'ASSET_NOTES.md', 'fonts/OFL.txt']);
 
 function walk(dir, out = []) {
   for (const name of readdirSync(dir).sort()) {

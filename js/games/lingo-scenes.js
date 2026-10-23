@@ -177,4 +177,5 @@ export const PACES = [
   { id: 'relaxed', name: 'Relaxed', patience: 1.4, gap: 1.25, points: 0.8, text: 'People wait longer. Good for brand-new words.' },
   { id: 'normal', name: 'Normal', patience: 1, gap: 1, points: 1, text: 'The usual pace.' },
   { id: 'rush', name: 'Rush', patience: 0.75, gap: 0.8, points: 1.5, text: 'Short patience and more arrivals, worth 50% more points.' },
+  { id: 'practice', name: 'Untimed', patience: 1, gap: 1.5, points: .5, text: 'No patience countdown. Take all the time you need to understand each request.' },
 ];

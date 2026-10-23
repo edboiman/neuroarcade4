@@ -2,6 +2,7 @@ import { h, icon, modal, toast } from './ui.js';
 import { store } from './store.js';
 import { VERSION } from './version.js';
 import { OVERDUE_DAYS } from './weekly.js';
+import { GAMES } from './registry.js';
 
 export function mountSettings(root, ctx) {
   const toggle = (key, title, desc) => {
@@ -91,13 +92,16 @@ export function mountSettings(root, ctx) {
         toggle('saver', 'Battery saver', 'Caps animation at 30 frames per second and lowers graphics resolution. On by default.'),
         toggle('sound', 'Sound', 'Game tones and small effects.'),
         toggle('haptics', 'Vibration', 'Short buzzes on swipes and game events.'),
-        toggle('reduce', 'Reduce motion', 'Removes screen transitions and card animation.'),
+        toggle('reduce', 'Reduce motion', 'Removes transitions, screen shake, and decorative animation.'),
+        toggle('largeText', 'Larger text', 'Larger instructions, menus, and interface text.'),
       ),
       h(
         'section',
         { class: 'block' },
-        h('h2', null, 'Weekly rotation'),
-        h('p', { class: 'fine' }, `Play each of the five games at least once every week. If a game goes ${OVERDUE_DAYS} days or more without a turn, the home screen shows a reminder. Nothing is ever locked. A session counts when you finish it or play for at least a minute.`),
+        h('h2', null, 'Your weekly goal'),
+        h('p', { class: 'fine' }, 'Pick a comfortable number of sessions. Play any games you enjoy. A completed game or a minute of active play counts.'),
+        h('div', { class: 'theme-chips', role: 'group', 'aria-label': 'Sessions per week' }, [1,2,3,4,5,6,7].map(n => h('button', {class:'theme-chip' + (store.pref('arcade','goal',3)===n?' on':''), type:'button', 'aria-pressed':String(store.pref('arcade','goal',3)===n), onclick:e=>{store.setPref('arcade','goal',n);const parent=e.currentTarget.parentElement; for(const b of parent.children){b.classList.toggle('on', b===e.currentTarget);b.setAttribute('aria-pressed',String(b===e.currentTarget));}}},String(n)))),
+        toggle('reminders', 'Variety reminders', 'Show optional suggestions on the progress screen for games you have not played recently.'),
       ),
       h(
         'section',

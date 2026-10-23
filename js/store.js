@@ -21,7 +21,7 @@ export function defaults() {
   return {
     v: 1,
     created: Date.now(),
-    settings: { saver: true, sound: true, haptics: true, reduce: false },
+    settings: { saver: true, sound: true, haptics: true, reduce: false, largeText: false, reminders: false },
     sessions: [],
     checkins: [],
     skills: {},
@@ -43,6 +43,8 @@ export function sanitize(raw) {
     sound: bool(st.sound, true),
     haptics: bool(st.haptics, true),
     reduce: bool(st.reduce, false),
+    largeText: bool(st.largeText, false),
+    reminders: bool(st.reminders, false),
   };
   if (Array.isArray(raw.sessions)) {
     for (const s of raw.sessions.slice(-MAX_SESSIONS * 2)) {
@@ -55,6 +57,7 @@ export function sanitize(raw) {
         l: num(s.l, 0, 999, 0),
         a: s.a == null ? null : num(s.a, 0, 1, 0),
         c: bool(s.c, false),
+        mode: typeof s.mode === 'string' && /^[a-z0-9_-]{1,64}$/.test(s.mode) ? s.mode : 'standard',
       });
     }
     d.sessions.sort((a, b) => a.t - b.t);
@@ -81,7 +84,11 @@ export function sanitize(raw) {
           if (safeKey(k)) box[k] = Math.round(num(v, 0, 4, 0));
         }
       }
-      d.skills[id] = { rung: Math.round(num(sk.rung, 1, 20, 1)), box };
+      const reviews = {};
+      if (sk.reviews && typeof sk.reviews === 'object') for (const [k, v] of Object.entries(sk.reviews).slice(0, 600)) {
+        if (safeKey(k) && v && typeof v === 'object') reviews[k] = { due: num(v.due, 0, 4e12, 0), interval: num(v.interval, 0, 365, 0), last: num(v.last, 0, 4e12, 0) };
+      }
+      d.skills[id] = { rung: Math.round(num(sk.rung, 1, 20, 1)), box, reviews };
     }
   }
   if (raw.prefs && typeof raw.prefs === 'object') {
@@ -153,6 +160,7 @@ export const store = {
       l: Math.round(num(s.l, 0, 999, 0)),
       a: s.a == null ? null : num(s.a, 0, 1, 0),
       c: !!s.c,
+      mode: typeof s.mode === 'string' && /^[a-z0-9_-]{1,64}$/.test(s.mode) ? s.mode : 'standard',
     });
     if (mem.sessions.length > MAX_SESSIONS) mem.sessions.splice(0, mem.sessions.length - MAX_SESSIONS);
     write();
@@ -171,7 +179,7 @@ export const store = {
   },
   skill(id) {
     if (!safeKey(id)) return { rung: 1, box: {} };
-    if (!mem.skills[id]) mem.skills[id] = { rung: 1, box: {} };
+    if (!mem.skills[id]) mem.skills[id] = { rung: 1, box: {}, reviews: {} };
     return mem.skills[id];
   },
   saveSkills() {
@@ -203,7 +211,9 @@ export const store = {
     }
   },
   loadGame(id) {
-    return safeKey(id) ? read(SAVE_PREFIX + id) : null;
+    if (!GAME_IDS.includes(id)) return null;
+    const raw = read(SAVE_PREFIX + id);
+    try { return JSON.stringify(raw).length <= MAX_SAVE_BYTES ? raw : null; } catch { return null; }
   },
   clearGame(id) {
     try {
@@ -213,7 +223,9 @@ export const store = {
     }
   },
   exportText() {
-    return JSON.stringify({ app: 'neuro-arcade', format: 1, exported: new Date().toISOString(), data: mem }, null, 1);
+    const saves = {};
+    for (const id of GAME_IDS) { const run = this.loadGame(id); if (run) saves[id] = run; }
+    return JSON.stringify({ app: 'neuro-arcade', format: 2, exported: new Date().toISOString(), data: mem, saves }, null, 1);
   },
   importText(text) {
     if (typeof text !== 'string' || text.length > MAX_IMPORT_BYTES) return { ok: false, error: 'That file is too large to be a Neuro Arcade backup.' };
@@ -225,6 +237,7 @@ export const store = {
     }
     if (!parsed || parsed.app !== 'neuro-arcade' || !parsed.data) return { ok: false, error: 'That file is not a Neuro Arcade backup.' };
     mem = sanitize(parsed.data);
+    for (const id of GAME_IDS) { this.clearGame(id); if (parsed.saves && Object.hasOwn(parsed.saves, id)) this.saveGame(id, parsed.saves[id]); }
     write();
     return { ok: true, sessions: mem.sessions.length };
   },

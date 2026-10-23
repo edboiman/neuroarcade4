@@ -1,5 +1,7 @@
 // Block Fit: touch UI for the rules engine in blockfit-core.js.
 import * as core from './blockfit-core.js';
+import { restore, saveRun } from '../checkpoint.js';
+import { validBlocks } from '../game-validation.js';
 import { h, icon, haptic } from '../ui.js';
 import { createLoop } from '../loop.js';
 import { gameTop, hud, overlay, mmss } from './common.js';
@@ -7,7 +9,10 @@ import { gameTop, hud, overlay, mmss } from './common.js';
 const COLORS = [null, '#38e1ff', '#ffd23f', '#b388ff', '#5af78e', '#ff5d73', '#5b8cff', '#ff9f43'];
 
 export function mount(root, ctx) {
-  const g = core.createGame(Date.now() & 0x7fffffff);
+  const old=ctx.resume?restore(ctx.store.loadGame('blockfit'),validBlocks):null;
+  const g = old ? old.state : core.createGame(ctx.seed ?? (Date.now() & 0x7fffffff));
+  const save=()=>saveRun(ctx.store,'blockfit',g,{mode:ctx.mode});
+  let lastSavePiece=-1;
   let state = 'ready'; // ready | play | paused | over
   let dirty = true;
   let lastSig = '';
@@ -291,20 +296,22 @@ export function mount(root, ctx) {
     score.set(g.score.toLocaleString());
     level.set(g.level);
     time.set(mmss(core.TIME_LIMIT_MS - g.elapsed));
+    if(g.pieces!==lastSavePiece){lastSavePiece=g.pieces;save();}
     if (g.over) end();
   }
   const loop = createLoop(frame, ctx.fps);
 
   function start() {
-    state = 'play';
+    state = 'play'; ctx.playing(true);
     loop.start();
-    dirty = true;
+    dirty = true; save();
   }
   function end() {
     if (state === 'over') return;
-    state = 'over';
+    state = 'over'; ctx.playing(false);
     loop.stop();
     draw();
+    ctx.store.clearGame('blockfit');
     ctx.finish({
       score: g.score,
       level: g.level,
@@ -314,19 +321,20 @@ export function mount(root, ctx) {
   }
   function openPause() {
     if (state !== 'play' || pauseOv) return;
-    state = 'paused';
+    state = 'paused'; ctx.playing(false);
+    g.soft=false;save();
     loop.stop();
     pauseOv = overlay(el, {
       title: 'Paused',
       body: h('p', null, 'The clock is stopped.'),
       buttons: [
-        { label: 'Quit game', kind: 'danger', onclick: () => ctx.exit() },
+        { label: 'Save & leave', onclick: () => {save();ctx.exit();} },
         {
           label: 'Resume',
           kind: 'primary',
           onclick: () => {
             pauseOv = null;
-            state = 'play';
+            state = 'play'; ctx.playing(true);
             loop.start();
           },
         },
@@ -452,11 +460,12 @@ export function mount(root, ctx) {
       h('p', null, 'Fit the falling shapes into complete rows. You have three minutes.'),
       h('ul', null, h('li', null, 'Drag sideways to move, tap to rotate.'), h('li', null, 'Flick down to drop. Hold a finger low to fall faster.'), h('li', null, 'The buttons below do the same things.'), h('li', null, 'From level 2, a red frame means a twist is active. Watch the banner and adapt.')),
     ),
-    buttons: [{ label: 'Start', kind: 'primary', onclick: start }],
+    buttons: [{ label: old ? 'Continue game' : 'Start', kind: 'primary', onclick: start }],
   });
 
   return {
     destroy() {
+      if(state!=='ready'&&state!=='over')save();
       loop.destroy();
       ro.disconnect();
       stopL();

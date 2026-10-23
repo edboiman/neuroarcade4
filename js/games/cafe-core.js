@@ -3,6 +3,7 @@
 import { itemById, sentence, english, englishLine, frameCount } from './cafe-data.js';
 import { sceneById, PACES } from './lingo-scenes.js';
 import { mulberry32, shuffle, weighted } from './rng.js';
+import { reviewOrder } from '../reviews.js';
 
 export const TABLES = 4;
 export const HEARTS = 5;
@@ -22,28 +23,29 @@ export function planNew(box, shift, sceneId = 'cafe') {
 }
 
 // The words on the tray: the new ones plus the weakest review words, up to TRAY_MAX.
-export function buildTray(box, newIds, sceneId = 'cafe') {
+export function buildTray(box, newIds, sceneId = 'cafe', reviews = null, now = Date.now()) {
   const order = sceneById(sceneId).items;
   const pos = (id) => order.indexOf(id);
   const known = Object.keys(box).filter((id) => order.includes(id) && !newIds.includes(id));
   known.sort((a, b) => box[a] - box[b] || pos(a) - pos(b));
   const room = Math.max(0, TRAY_MAX - newIds.length);
-  const pick = known.slice(0, room);
+  const pick = (reviews ? reviewOrder(known, box, reviews, now) : known).slice(0, room);
   const ids = [...newIds, ...pick];
   // keep the tray in a stable order so buttons do not jump around between shifts
   return ids.sort((a, b) => pos(a) - pos(b));
 }
 
 // featured: the words taught in this shift's lesson. They are treated as new today, but keep the box the lesson gave them.
-export function createShift({ lang = 'es', box = {}, shift = 1, seed = 1, featured = null, scene = 'cafe', pace = 'normal' } = {}) {
+export function createShift({ lang = 'es', box = {}, shift = 1, seed = 1, featured = null, scene = 'cafe', pace = 'normal', reviews = null, now = Date.now() } = {}) {
   const rnd = mulberry32(seed);
   const sc = sceneById(scene);
   const newIds = featured ? featured.filter((id) => itemById(id) && sc.items.includes(id)) : planNew(box, shift, sc.id);
   const b = { ...box };
   for (const id of newIds) b[id] = b[id] ?? 0;
-  const tray = buildTray(b, newIds, sc.id);
+  const tray = buildTray(b, newIds, sc.id, reviews, now);
   const total = customersForShift(shift);
   return {
+    seed,
     scene: sc.id,
     pace: PACES.find((p) => p.id === pace) || PACES[1],
     lang,
@@ -178,7 +180,7 @@ export function tick(s, dt) {
   for (const c of s.slots) {
     if (!c) continue;
     if (c.state === 'waiting') {
-      c.patience -= dt;
+      if (s.pace.id !== 'practice') c.patience -= dt;
       if (c.patience <= 0) leave(s, c);
     } else {
       c.leaveIn -= dt;
