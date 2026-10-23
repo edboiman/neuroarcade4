@@ -1,45 +1,67 @@
-# Neuro Arcade
+# Neuro Arcade 2
 
-Five short brain games in one installable, fully offline app. No accounts, no ads, no servers, no tracking.
+Ten playable games in a responsive, installable, offline-first arcade. No account, ads, trackers, production dependencies, or remote services.
 
-| Game | What it exercises |
+## Upload to GitHub
+
+1. Extract this ZIP.
+2. Upload **all of its contents** to your repository root, preserving `assets`, `css`, `fonts`, `icons`, `js`, `tools`, and `.github`. Do not upload only `index.html`.
+3. In GitHub, open **Settings → Pages**. Deploy from your `main` branch and `/ (root)`.
+4. Open your Pages address. On Android, use the browser's **Install app / Add to Home screen** option.
+5. Allow the initial installation to complete. Settings will show **Ready to play offline**. Test by closing the app, switching to airplane mode, and reopening it.
+
+If replacing the previous version, keep the same Pages address so your browser retains its progress. Export a backup from Settings before replacing files. When an installed app reports an update, restart it from Settings. Do not erase your browser data to update.
+
+## The games
+
+| Game | Play |
 | --- | --- |
-| Block Fit | Planning, mental flexibility (rules twist every so often), spatial reasoning |
-| Lingo | Learn Spanish, French or German from zero in six scenarios (café, clothes shop, home, train station, flight cabin, hotel): a short picture lesson and quiz, then a timed shift where people ask you for things. Spaced repetition shared across scenarios |
-| Holiday Horde | A survivor-style action game whose theme follows the holiday season. Auto-aim or hold-to-aim touch controls, upgrade paths, and a milestone reward every five levels (companion, chain lightning, blasts, barrier and more). Divided attention, quick decisions |
-| Tycoon Row | An original property-trading game on a full 40-square board against three chatty rivals. Planning, probability sense, risk |
-| Deep Delve | A turn-based dungeon where you study each floor, then cross it in the dark. Spatial memory, navigation, planning ahead |
+| Block Fit | The existing single falling-block game, with refined controls and presentation. No Classic/Puzzle/Twist mode split was added. |
+| Lingo | Six locations in Spanish, French, or German; vocabulary lessons, request practice, date-based review scheduling, and an untimed pace. |
+| Holiday Horde | Four-minute survival, three starting builds, upgrade combinations, companions, bosses, and seasonal hazards that warn before they strike. |
+| Tycoon Row | Property strategy with three rivals, visible development, financial context, speed control, and resumable games. |
+| Deep Delve | Memorize chambers and landmarks, navigate by torchlight, and fight using telegraphed attacks, defense, dodges, and counters. Includes a safe playable combat lesson. |
+| Signal Junction | Route twelve trains to numbered/color-matched stations. Use hold settings to stagger trains and avoid collisions. |
+| Clockwork Workshop | Rotate conduits to restore three circuits. Connected power is visible; blueprint hints trade score for help. |
+| Casebook | Five illustrated mysteries with inspectable evidence, a persistent notebook, and explanations. |
+| Echo Garden | Replay growing numbered lantern sequences, using sound, visuals, or keyboard 1–4. |
+| Pocket Logistics | Load two parcels at a time, preview routes around roadworks, and deliver five packages within your fuel budget. |
 
-## Put it on your phone
+## Your arcade
 
-1. Create a GitHub repository and upload everything in this folder (keep the folder structure, including `.nojekyll` and `.github`).
-2. In the repository go to **Settings > Pages**, set **Source** to *Deploy from a branch*, choose `main` and `/ (root)`, and save.
-3. After a minute your app is at `https://<your-username>.github.io/<repo-name>/`.
-4. Open that address in Chrome on your Android phone, open the menu and choose **Install app** (or **Add to Home screen**).
-5. Open the app once while online so it can store itself. Test it: switch on airplane mode and open it from the home screen.
+- Browse all games, filter by category or session length, or continue a saved game.
+- Choose a comfortable weekly session goal from 1 to 7. You can play any games; no weekly gate interrupts you.
+- Try a locally seeded daily challenge. Comparisons distinguish daily seeds, practice, and relevant difficulty settings.
+- Unlock room decorations at 3, 8, 15, and 30 counted sessions. All games remain available from the start.
+- Settings includes larger text, reduced motion, sound, vibration, battery saver, and backup import/export.
 
-## The weekly rotation
+All games save active runs locally. Real-time games checkpoint periodically and when paused or left; turn-based games save at action boundaries. A sudden browser/process termination can lose the last few seconds of a real-time game. Backups include current run checkpoints, settings, scores, and language reviews. Old progress-only backups remain importable.
 
-The week runs Monday to Sunday. Play each of the five games at least once per week. A session counts when you finish it or play at least a minute. If a game goes 7 days or more without being played, the home screen shows a reminder and a badge on that game. Nothing is ever locked. The hub shows progress, there is a gate when a new week starts, and finishing all five builds a streak.
+Lingo's optional Listen button uses **only an installed local system voice**. If none is available in the selected language, the app displays a text fallback. It does not download voices or use a cloud speech service. The compact conversation exercise focuses on understanding requests; it is not a full conversational language course.
 
-An installed app cannot open itself, so set a weekly reminder on your phone.
+## Deep Delve controls and combat
 
-Change the numbers in `js/weekly.js` (`OVERDUE_DAYS`, `MIN_SESSION_SEC`), then run `node tools/build.mjs`.
+- Tap an explored tile to walk; automatic walking stops when danger appears.
+- Tap an adjacent enemy, use **Attack**, or press **F** to strike.
+- An amber marker shows where an enemy will attack on its next action.
+- Use **Defend / G** to block a marked attack and charge a two-damage counter, or move out of the marked tile to dodge.
+- **Wait / Space** advances a turn. Arrow keys / WASD or on-screen arrows move.
+- Enemies recover after attacking. Walls and invalid attacks do not consume turns.
+- Each floor provides one Scout. Revealed spikes are spent and do not repeatedly damage you.
+- Practice removes the map-study countdown. The combat lesson is available before entering and from Pause.
 
-## Progress and check-in
+## Develop and verify
 
-The Progress screen shows each game's weekly average, best and level, with the change from last week. The 90-second Check-in (reaction time and digit span) gives you a game-independent measure to compare over months. Settings has battery saver, sound, vibration, reduced motion, and export, import and erase of your data.
+Requires Node 20 or later. The app itself has no package dependencies.
 
-## Updating
+```sh
+npm run check
+```
 
-After you change any file, run `node tools/build.mjs` and commit the result. It stamps a new version so phones pick up the update; the app shows a *Restart* button when one is ready.
+This stamps the service worker, checks the offline file list and security rules, and runs the original and upgrade regression suites.
 
-Checks (Node 20 or newer, no dependencies): `node tools/audit.mjs` (security rules) and `node tools/test.mjs` (game and storage logic).
+After changing application files, run `npm run build` and commit the resulting `sw.js` and `js/version.js`. The version module is intentionally excluded from the version hash, but included in the offline cache.
 
-## Honest note on the evidence
+An optional Playwright smoke test is included in `tools/browser-smoke.cjs`. Install Playwright in a development environment, then run it with a supported Chromium executable. It checks all ten game launch/save/resume paths, mobile settings and Progress, offline reload, and GitHub Pages-style subpath hosting. No browser/test dependencies are included in the shipped app.
 
-Brain training reliably gets you better at the practised tasks. Transfer to everyday thinking is modest and debated. The best support is for learning demanding new skills, varied practice, and spatial navigation. Lingo has the clearest learning mechanism (spaced repetition of real vocabulary). Block Fit and Deep Delve exercise planning and spatial memory. Holiday Horde and Tycoon Row are included mostly because they are fun to keep coming back to; they are not clinically validated. This is mental exercise, not a medical treatment, which is why the Check-in exists.
-
-## Battery
-
-Frame rate is capped (30 fps in battery saver, the default), drawing stops when the app is hidden, canvases are capped in resolution, the interface is OLED-black, audio is released when idle, and the screen is never kept awake.
+See `RELEASE_NOTES.md`, `CLAUDE.md`, `SECURITY.md`, and `ASSET_NOTES.md` for implementation details.

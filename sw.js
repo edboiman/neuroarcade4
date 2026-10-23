@@ -1,15 +1,21 @@
 // Offline cache. All files are stored at install time and served cache-first.
 // This worker never contacts any server except to download this app's own files once per update,
 // and it ignores every cross-origin request.
-const VERSION = 'd9bd2102f4';
+const VERSION = 'a2262f93e6';
 const PREFIX = 'neuro-arcade-';
 const CACHE = PREFIX + VERSION;
 const PRECACHE = [
   /*PRECACHE_START*/
   './',
+  './assets/arcade-room.webp',
+  './assets/cafe.webp',
+  './assets/city.webp',
+  './assets/dungeon.webp',
+  './assets/forest.webp',
   './css/base.css',
   './css/games.css',
   './css/hub.css',
+  './css/rooms.css',
   './css/screens.css',
   './css/theme.css',
   './fonts/poppins-400.woff',
@@ -21,7 +27,10 @@ const PRECACHE = [
   './index.html',
   './js/art.js',
   './js/audio.js',
+  './js/catalog.js',
   './js/checkin.js',
+  './js/checkpoint.js',
+  './js/game-validation.js',
   './js/games/blockfit-core.js',
   './js/games/blockfit.js',
   './js/games/cafe-core.js',
@@ -35,9 +44,12 @@ const PRECACHE = [
   './js/games/estate-chat.js',
   './js/games/estate-core.js',
   './js/games/estate.js',
+  './js/games/item-art.js',
   './js/games/lingo-art.js',
   './js/games/lingo-scenes.js',
   './js/games/rng.js',
+  './js/games/rooms-core.js',
+  './js/games/rooms.js',
   './js/games/survivor-art.js',
   './js/games/survivor-core.js',
   './js/games/survivor-input.js',
@@ -46,13 +58,18 @@ const PRECACHE = [
   './js/hub.js',
   './js/loop.js',
   './js/main.js',
+  './js/miniatures.js',
   './js/registry.js',
+  './js/reviews.js',
+  './js/session.js',
   './js/settings.js',
+  './js/speech.js',
   './js/stats.js',
   './js/store.js',
   './js/ui.js',
   './js/weekly.js',
-  './manifest.webmanifest'
+  './manifest.webmanifest',
+  './js/version.js'
   /*PRECACHE_END*/
 ];
 
