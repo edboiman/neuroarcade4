@@ -1,85 +1,46 @@
-# Cinderpath — playable roguelike deck-builder
+# Cinderpath 2.4 — The deeper climb
 
-Status: implemented in Neuro Arcade 2.3. It passed its standalone engine and full browser expedition before joining the arcade catalog.
+Cinderpath is a complete original solo deck-building expedition inside the twelve-game Neuro Arcade collection. See `CINDERPATH_COMPARISON.md` for the research, gaps and adaptation decisions.
 
-## Direction
+## Travelers and content
 
-A solo, turn-based deck-building expedition through a ruined sky monastery. You play the Lanternbearer, carrying the last living ember through three distinct areas. Choose a route, predict enemy actions, build a focused deck, and defeat the guardian at the end of each area.
+- **Lanternbearer:** 80 base health. Ember damage, sacrifice, conversion and exhaust synergies. Coal Charm boosts the first Attack in a battle.
+- **Ironbound:** 90 base health. Forge generation, stored-resource payoffs, block and counterattacks. Traveler’s Anvil improves the first block effect each turn and generates Forge.
+- **Starweaver:** 78 base health. Glimmer costs, temporary Shards, Scry, card retention and draw manipulation. Sleeping Prism provides starting and recurring Glimmer.
 
-The design takes its broad genre inspiration from Slay the Spire. Cinderpath uses original characters, cards, relics, enemies, visual identity, encounters and text. Its first release is a complete compact expedition that fits an offline browser arcade.
+Each hero has 21 class cards. Eleven shared cards and two basic cards bring the playable total to 76. Six additional definitions handle statuses, curses and a generated token. Each playable card has an upgraded version. The game contains 32 relics, eight potions, five enchantments, ten event types, six guardians and 17 enemy definitions.
 
-## Core play
+New expeditions contain three acts of twelve stops. Each act chooses one of two environments. A Waykeeper, treasure room, final camp and guardian anchor the route; explicit connections govern the intervening branches. Unknown rooms resolve when entered and remain fixed in the save.
 
-Start with a ten-card deck, three energy per turn, and a five-card hand. Cards deal damage, grant block, draw more cards, or create combinations. Used cards go to a discard pile; drawing through the deck reshuffles that pile. Enemy intent is visible before the player acts. Health persists between encounters, so a win can still carry a cost.
+## Combat order
 
-After battles, choose one of three card rewards or skip the reward to keep the deck focused. Routes branch between battles, elite encounters, story events, merchants and campfires. Campfires offer healing or a permanent card upgrade. Merchants offer cards, relics, healing and paid card removal. Relics modify an entire run and should create decisions that differ from simply adding damage.
+1. Begin the player turn: reset/retain block, replenish energy, generate resources, resolve turn-start powers, and draw five new cards up to the ten-card hand limit. Innate cards count toward the opening hand; retained cards remain in addition to later draws.
+2. Check a selected card’s ownership, energy, Glimmer/Forge requirement, target and pending-choice status before mutating anything.
+3. Pay costs and remove the card from hand. Apply a one-play affliction, resolve effects in printed order, then move the resolving card to discard, exhaust or powers. It cannot draw itself while resolving.
+4. Scry holds inspected cards in a separate zone. Recovery leaves its options in discard. Other draw triggers wait until the player commits the pending choice. Enemy actions and further plays wait too.
+5. End turn: resolve held-card damage, Retain, Ethereal and discard. Ember then damages enemies before any of them act and loses one stack. Dead enemies cannot act.
+6. Resolve each surviving enemy’s displayed action. New summons wait until the next enemy phase. Awakening guardians return once with 40% health and extra Strength.
 
-## First release scope
+Strength adds damage per hit. Weak multiplies attack damage by 75%; Vulnerable by 150%; round down. Enemy Armor then reduces each direct hit. Block absorbs the remainder. Ember bypasses block and Armor. Enemy Thorns returns damage on Attack hits and can be blocked. Forge and Glimmer cap at twelve and reset between battles. Health persists.
 
-| Part | Target |
-| --- | --- |
-| Playable hero | One fully developed Lanternbearer |
-| Card pool | 30 original cards, each with an upgraded version |
-| Relics | 12 passive effects |
-| Areas | Three, with six route stages each and a distinct guardian |
-| Encounters | A mix of single enemies and small groups, with clear behavior patterns |
-| Run length | Target 15–25 minutes, saved after each action |
-| Controls | Select a card, then its target; large touch targets and full keyboard support |
-| Difficulty | A readable opening and more demanding enemy patterns later |
+## Cards and consumables
 
-Playable areas:
+Retain, Ethereal, Innate, Exhaust, X costs and power effects have explicit text. Blue costs consume Glimmer in addition to energy. Some Forge/Glimmer payoffs consume the stored resource. Inspectors show draw contents sorted, never the actual draw order; Scry earns a view of upcoming cards.
 
-- **The Ember Cloister:** amber lanterns, broken bells, slate arches, and ash creatures.
-- **The Verdant Foundry:** living roots wrapped around brass machinery, green fire, and armored guardians.
-- **The Starless Choir:** dark glass, suspended bridges, violet light, and the final guardian.
+Keen, Warded, Kindled, Flowing and Swift are additional run-long enchantments. Taxed and Brittle are battle-only card afflictions. Status cards disrupt the current battle; Curse cards remain in the permanent deck until removed or transformed where allowed.
 
-## Three build directions
+Potions cost no energy. Targeted potions require a living enemy; self/all potions use the selected-potion button. Lifedrop also works outside combat. A full belt requires discarding or replacing a potion before collecting another. Capacity changes and pact tradeoffs are stated on the relics.
 
-- **Ember:** apply a damage-over-time effect, spread it, and trigger larger attacks from accumulated stacks.
-- **Bastion:** generate block, retain some protection, and turn defense into counters.
-- **Momentum:** draw, manipulate energy, and chain inexpensive cards into longer turns.
+## Expedition and progression
 
-These share one card pool, so the player can combine them instead of choosing a permanent class specialization.
+Cards, potions and relics can be skipped independently. Merchant prices/stock, event offers, unknown-room results and Waykeeper gifts are fixed after generation. Campfires offer healing or a permanent upgrade; Glass Covenant removes camp healing. Clearing a guardian heals 15 before the next act.
 
-Selected cards (base versions):
+All heroes and pools are available immediately. Wins unlock the next challenge for that hero, through Challenge V. A local chronicle keeps the last thirty terminal runs, seeds, final decks, relics, discoveries and unlocked story fragments. Scores compare hero/challenge variants separately. Optional seed entry supports replaying an expedition.
 
-| Card | Cost | Effect |
-| --- | --- | --- |
-| Lantern Strike | 1 | Deal 6 damage. |
-| Brace | 1 | Gain 7 block. |
-| Searing Mark | 1 | Deal 3 damage and apply 3 Ember. |
-| Backdraft | 0 | Deal damage based on the target’s Ember, then draw a card. |
-| Kilnheart | 2 | For this battle, gain block whenever you apply Ember. |
-| Hold the Line | 1 | Gain block and retain the remaining block for one turn. |
+## Controls and saves
 
-## Presentation
+Select a card, then its enemy. Self/all cards use Play selected card. Keyboard 1–9 selects a hand card; arrows change targets; Enter commits; E ends turn; Escape cancels or pauses. Native buttons also support Tab/Enter. Card hands scroll horizontally on phones.
 
-Combat should feel like a scene: a visible hero, distinct enemies, readable intent symbols, impact animation, and architecture tied to the current area. Cards need illustrated motifs, clear costs and complete effect text. A phone should show readable cards in a horizontally scrolling hand rather than shrinking five cards into tiny buttons. Route choices should stay legible without pinch zoom.
+Every committed action saves the complete route, RNG, card zones, generated cards, pending choice, afflictions, potions, intentions and reward state. Invalid actions consume nothing. Terminal states clear the checkpoint and record one result. Failed device writes retain an exportable in-memory checkpoint with a warning; it cannot survive browser closure.
 
-Use animation to show card use and damage resolution. Reduced motion keeps the same information with fades or immediate changes. Color is supplemented by symbols, labels and numbers. Combat waits for player input; no shooting gesture or real-time movement is required.
-
-## Reliability requirements
-
-- Save the exact deck, draw/discard/exhaust piles, hand, enemy intent, route, relics and random-generator position after every committed action.
-- Resume at the same decision, with no rerolled reward, free heal, lost card or repeated enemy action.
-- Every card must occupy exactly one combat zone. Exhaust and power effects must not duplicate cards.
-- Illegal targets, unaffordable cards and cancelled selections must consume no energy or turns.
-- Damage, block, multi-hit attacks, statuses, deaths and on-kill effects must resolve in a documented order.
-- A defeated enemy cannot attack later in the same turn. Defeat and victory record one result and clear the run checkpoint.
-- Shops, card removal, upgrades and rewards must validate ownership, price, eligibility and deck-size limits.
-- Browser back, backgrounding and installed-app updates must preserve a stable decision.
-- Test complete seeded expeditions, every card/relic, all enemy patterns, save/resume at each phase, touch targeting, keyboard navigation, and root/subpath offline operation.
-
-## Implemented controls and rules
-
-Tap or click a card, then its living target. Self/all-target cards use the Play selected card button. Keyboard 1–9 selects a hand card; left/right changes enemy target; Enter commits; E ends the turn; Escape cancels or pauses. Hand cards stay readable in a horizontal phone scroller. Deck and zone inspectors pause play; draw pile contents are shown sorted, never in draw order.
-
-Each attack hit adds Strength, then Weak reduces damage by 25%, then enemy Vulnerable increases it by 50%; floor the result. Block absorbs attack damage. Ember bypasses block at enemy-phase start, then decreases by one. All Ember deaths resolve before enemies act. Enemy intentions include block, attacks, growth, Weak and healing, and remain fixed through reloads. Block normally clears at the next player turn; Hold the Line or Ward Seal can retain it. Exhaust and powers reset between battles; health persists. Clearing the first two guardians heals 15 before the next area.
-
-The opening deck has five Lantern Strikes, four Braces and one Searing Mark. Card rewards can be skipped. The deck cap is sixty; shops preserve at least five cards and charge progressively more for removal. Each card exists in exactly one combat zone at stable action boundaries. The current resolving card cannot be drawn again until its effects finish.
-
-## Validation
-
-The new engine suite exercises all cards/upgrades and enemy patterns, exact damage/status ordering, illegal actions, shops, relic effects, card conservation, corrupted snapshots, all six decision phases and 150 complete seeded expeditions using three legal development policies. Browser coverage completes the expedition via real touch and keyboard controls, reloads every decision phase without changing RNG/rewards/intentions, verifies desktop/mobile presentation, records one terminal result, and clears its checkpoint. The standalone browser harness ran before catalog integration; the integrated test then checks the actual arcade.
-
-Additional heroes and card pools remain future work.
+2.3 checkpoints migrate without rerolling the current decision and keep their original six-stop areas. New expeditions use the expanded map. All data remains local and is included in Settings backup/export; reset clears the chronicle too. No runtime networking, login or multiplayer system is included.

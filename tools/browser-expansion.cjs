@@ -11,7 +11,7 @@ browser=await chromium.launch({executablePath:process.env.BROWSER_EXECUTABLE || 
 const context=await browser.newContext({viewport:{width:412,height:915},hasTouch:true,isMobile:true,deviceScaleFactor:1});
 const page=await context.newPage();page.setDefaultTimeout(10000);
 const shot=async name=>{if(process.env.QA_OUTPUT_DIR){fs.mkdirSync(process.env.QA_OUTPUT_DIR,{recursive:true});await page.screenshot({path:path.join(process.env.QA_OUTPUT_DIR,name+'.png')});}};const errors=[];const failRequests=[];
-page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text().slice(0,300))});page.on('response',r=>{if(r.status()>=400)failRequests.push(r.url()+': '+r.status());});
+page.on('pageerror',e=>{errors.push(e.message);console.error('PAGE ERROR',e.stack||e.message)});page.on('console',m=>{if(m.type()==='error')errors.push(m.text().slice(0,300))});page.on('response',r=>{if(r.status()>=400)failRequests.push(r.url()+': '+r.status());});
 await page.goto(base);await page.waitForTimeout(350);
 await shot('arcade-mobile');
 for(const name of ['Marbleworks','Bannerfall']){await page.getByRole('button',{name:'Play '+name,exact:true}).click();await page.locator('.game-overlay').waitFor();await page.goBack();await page.locator('.arcade-header').waitFor();}
