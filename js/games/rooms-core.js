@@ -63,6 +63,8 @@ export function makeWorkshop(g) {
     const turns=Math.floor(g.rnd()*4); for(let i=0;i<turns;i++) c.mask=rotateMask(c.mask);
   }
   g.cells=cells; g.stageMoves=0; g.lit=[]; g.solved=false; workshopPower(g);
+  // Never offer a puzzle that is already solved. Turn the source away from input.
+  if(g.solved){for(let i=0;i<4&&(g.cells[10].mask&8);i++)g.cells[10].mask=rotateMask(g.cells[10].mask);workshopPower(g);}
 }
 export function workshopPower(g) {
   const lit = new Set(); const q=[];
@@ -137,7 +139,7 @@ export function driveTown(g,tx,ty) {
 }
 export function nextRoom(g) {
   if(g.over)return false;
-  if(g.id==='workshop'&&g.solved){g.stage++;makeWorkshop(g);return true;}
+  if(g.id==='workshop'&&g.solved){if(g.stage>=3){g.over=true;g.won=true;}else{g.stage++;makeWorkshop(g);}return true;}
   if(g.id==='casebook'&&g.solved){g.case++;g.stage++;g.clues=[];g.solved=false;g.wrong=0;return true;}
   return false;
 }

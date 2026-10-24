@@ -115,6 +115,8 @@ function read(key) {
 
 let mem = sanitize(read(KEY));
 let persistFailed = false;
+const volatileSaves = new Map();
+const failedSaves = new Set();
 const listeners = new Set();
 
 function write() {
@@ -132,7 +134,7 @@ export const store = {
     return mem;
   },
   get persistFailed() {
-    return persistFailed;
+    return persistFailed || failedSaves.size > 0;
   },
   onChange(fn) {
     listeners.add(fn);
@@ -202,20 +204,32 @@ export const store = {
   },
   // Resumable game saves are kept apart from the main record.
   saveGame(id, obj) {
-    if (!safeKey(id)) return;
+    if (!safeKey(id)) return false;
+    const wasFailed = failedSaves.has(id);
     try {
       const txt = JSON.stringify(obj);
-      if (txt.length <= MAX_SAVE_BYTES) localStorage.setItem(SAVE_PREFIX + id, txt);
+      if (txt.length > MAX_SAVE_BYTES) return false;
+      // Keep a bounded in-memory copy if device storage rejects this write.
+      volatileSaves.set(id, JSON.parse(txt));
+      localStorage.setItem(SAVE_PREFIX + id, txt);
+      volatileSaves.delete(id);
+      failedSaves.delete(id);
+      if (wasFailed) for (const fn of listeners) fn();
+      return true;
     } catch {
-      /* ignore */
+      failedSaves.add(id);
+      if (!wasFailed) for (const fn of listeners) fn();
+      return false;
     }
   },
   loadGame(id) {
     if (!STORED_GAME_IDS.includes(id)) return null;
-    const raw = read(SAVE_PREFIX + id);
+    const raw = volatileSaves.has(id) ? volatileSaves.get(id) : read(SAVE_PREFIX + id);
     try { return JSON.stringify(raw).length <= MAX_SAVE_BYTES ? raw : null; } catch { return null; }
   },
   clearGame(id) {
+    volatileSaves.delete(id);
+    failedSaves.delete(id);
     try {
       localStorage.removeItem(SAVE_PREFIX + id);
     } catch {
@@ -243,6 +257,9 @@ export const store = {
   },
   reset() {
     mem = defaults();
+    volatileSaves.clear();
+    failedSaves.clear();
+    persistFailed = false;
     try {
       localStorage.removeItem(KEY);
       for (const g of STORED_GAME_IDS) localStorage.removeItem(SAVE_PREFIX + g);

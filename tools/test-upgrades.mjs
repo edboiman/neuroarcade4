@@ -4,11 +4,11 @@ import * as dg from './retired/dungeon-core.js';
 import * as es from '../js/games/estate-core.js';
 import * as bf from '../js/games/blockfit-core.js';
 import * as sv from '../js/games/survivor-core.js';
-import * as cf from '../js/games/cafe-core.js';
+import * as cf from './retired/lingo/cafe-core.js';
 import * as r from '../js/games/rooms-core.js';
 import { snapshot,restore } from '../js/checkpoint.js';
 import { validEstate,validBlocks,validHorde } from '../js/game-validation.js';
-import { scheduleReview,reviewOrder } from '../js/reviews.js';
+import { scheduleReview,reviewOrder } from './retired/lingo/reviews.js';
 import { dailySeed,goalProgress } from '../js/session.js';
 import { store,sanitize } from '../js/store.js';
 import { CATALOG,GAME_IDS } from '../js/catalog.js';
@@ -63,5 +63,20 @@ test('retirement: old scores and checkpoints survive backup import/export and re
  store.addSession({g:'dungeon',t:2,d:100,s:100,c:true});assert.equal(store.sessions().length,1);
  assert.equal(store.importText(JSON.stringify(out)).ok,true);assert.equal(store.loadGame('dungeon').state.seed,44);
  store.reset();assert.equal(store.loadGame('dungeon'),null);assert.equal(store.sessions().length,0);
+ }finally{store.importText(previousData);if(previousStorage===undefined)delete globalThis.localStorage;else globalThis.localStorage=previousStorage;}
+});
+test('language retirement: no Lingo launcher or reminders; vocabulary, reviews, history and saves remain in backups',async()=>{
+ const {GAMES,byId}=await import('../js/registry.js');
+ const {rotation,overdue}=await import('../js/weekly.js');
+ assert.equal(byId('cafe'),undefined);assert.ok(!GAMES.some(g=>g.category==='Learn'));
+ const previousStorage=globalThis.localStorage,previousData=store.exportText(),memory=new Map();
+ globalThis.localStorage={getItem:k=>memory.get(k)??null,setItem:(k,v)=>memory.set(k,String(v)),removeItem:k=>memory.delete(k)};
+ try{
+ const now=Date.now(),backup={app:'neuro-arcade',format:2,data:{sessions:[{g:'cafe',t:now-10*86400000,d:120,s:250,c:true}],skills:{cafe_es:{rung:2,box:{coffee:3},reviews:{coffee:{due:now,interval:7,last:now-86400000}}}},prefs:{cafe:{lang:1,scene:3}}},saves:{cafe:snapshot(cf.createShift({seed:37,lang:'es'}))}};
+ assert.equal(store.importText(JSON.stringify(backup)).ok,true);const out=JSON.parse(store.exportText());
+ assert.equal(out.data.skills.cafe_es.box.coffee,3);assert.equal(out.data.skills.cafe_es.reviews.coffee.interval,7);assert.equal(out.data.prefs.cafe.scene,3);assert.equal(out.data.sessions[0].s,250);assert.ok(out.saves.cafe);
+ assert.ok(!rotation(store.sessions(),now).remaining.includes('cafe'));assert.ok(!overdue(store.sessions(),now).some(x=>x.id==='cafe'));
+ store.addSession({g:'cafe',t:now,d:100,s:500,c:true});assert.equal(store.sessions().length,1);
+ assert.equal(store.importText(JSON.stringify(out)).ok,true);assert.ok(store.loadGame('cafe'));store.reset();assert.equal(store.loadGame('cafe'),null);
  }finally{store.importText(previousData);if(previousStorage===undefined)delete globalThis.localStorage;else globalThis.localStorage=previousStorage;}
 });

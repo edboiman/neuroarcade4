@@ -8,10 +8,10 @@ import * as bf from '../js/games/blockfit-core.js';
 import * as sv from '../js/games/survivor-core.js';
 import * as si from '../js/games/survivor-input.js';
 import { THEMES, themeForMonth } from '../js/games/survivor-themes.js';
-import * as cf from '../js/games/cafe-core.js';
-import * as cd from '../js/games/cafe-data.js';
-import { SCENES, PACES, sceneById } from '../js/games/lingo-scenes.js';
-import { buildQuiz, choicesFor } from '../js/games/cafe-lesson.js';
+import * as cf from './retired/lingo/cafe-core.js';
+import * as cd from './retired/lingo/cafe-data.js';
+import { SCENES, PACES, sceneById } from './retired/lingo/lingo-scenes.js';
+import { buildQuiz, choicesFor } from './retired/lingo/cafe-lesson.js';
 import { mulberry32 } from '../js/games/rng.js';
 import * as es from '../js/games/estate-core.js';
 import * as dg from './retired/dungeon-core.js';
@@ -55,11 +55,11 @@ test('rotation counts plays and never locks a game', () => {
 test('overdue warns after 7+ days without a counted session, including never-played games', () => {
   const now = at(2026, 10, 15);
   assert.deepEqual(weekly.overdue([], now), []);
-  const s = [mk('blockfit', now - 3 * DAY), mk('cafe', now - 7 * DAY - 1000), mk('survivor', now - 20 * DAY), mk('estate', now - 1 * DAY, { c: false, d: 10 })];
+  const s = [mk('blockfit', now - 3 * DAY), mk('curio', now - 7 * DAY - 1000), mk('survivor', now - 20 * DAY), mk('estate', now - 1 * DAY, { c: false, d: 10 })];
   const due = weekly.overdue(s, now);
   const ids = due.map((x) => x.id);
   assert.ok(!ids.includes('blockfit'));
-  assert.ok(ids.includes('cafe'));
+  assert.ok(ids.includes('curio'));
   assert.equal(due[0].days, 20);
   assert.ok(ids.includes('estate') && due.find((x) => x.id === 'estate').never, 'a too-short run does not count');
   assert.ok(!ids.includes('dungeon'), 'retired games never trigger reminders');
@@ -69,9 +69,9 @@ test('overdue warns after 7+ days without a counted session, including never-pla
 
 test('short abandoned sessions do not count; completed or 60s sessions do', () => {
   const now = at(2026, 10, 15);
-  const s = [mk('cafe', now - 1000, { c: false, d: 20 }), mk('survivor', now - 900, { c: false, d: 61 }), mk('estate', now - 800, { c: true, d: 5 })];
+  const s = [mk('curio', now - 1000, { c: false, d: 20 }), mk('survivor', now - 900, { c: false, d: 61 }), mk('estate', now - 800, { c: true, d: 5 })];
   const r = weekly.rotation(s, now);
-  assert.equal(r.counts.cafe, 0);
+  assert.equal(r.counts.curio, 0);
   assert.equal(r.counts.survivor, 1);
   assert.equal(r.counts.estate, 1);
 });
@@ -138,7 +138,7 @@ test('import rejects wrong, oversized, or malformed files; export round-trips', 
   assert.equal(store.importText(JSON.stringify({ app: 'other', data: {} })).ok, false);
   assert.equal(store.importText('x'.repeat(1600000)).ok, false);
   store.reset();
-  store.addSession({ g: 'cafe', t: Date.now(), d: 100, s: 321, l: 4, a: 0.8, c: true });
+  store.addSession({ g: 'curio', t: Date.now(), d: 100, s: 321, l: 4, a: 0.8, c: true });
   const text = store.exportText();
   store.reset();
   assert.equal(store.sessions().length, 0);
@@ -813,15 +813,11 @@ test('Scenarios: every scenario is complete in every language and builds correct
   assert.equal(cd.englishLine([{ id: 'key', qty: 1 }], 2, 'hotel'), 'Do you have a key?');
 });
 
-test('Scenarios: the home-screen shortcuts point at the right scenarios', async () => {
-  const { GAMES } = await import('../js/registry.js');
-  const lingo = GAMES.find((g) => g.id === 'cafe');
-  assert.equal(lingo.quick.length, SCENES.length);
-  lingo.quick.forEach((q, i) => {
-    assert.equal(q.value, i);
-    assert.ok(SCENES[i].name.toLowerCase().includes(q.label.toLowerCase()) || q.label === 'Station' || q.label === 'Shop', q.label);
-    assert.equal(q.icon, SCENES[i].look.icon);
-  });
+test('retired language scenarios remain available only to historical tests', async () => {
+  const {GAMES}=await import('../js/registry.js');
+  assert.equal(GAMES.find(g=>g.id==='cafe'),undefined);
+  assert.equal(SCENES.length,6);
+  assert.ok(SCENES.every(s=>s.id&&s.items.length));
 });
 
 test('Scenarios: shifts only use their own words, words carry over between scenarios, pace changes patience', () => {

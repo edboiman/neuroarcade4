@@ -282,7 +282,12 @@ async function boot() {
   weeklyIntro();
   registerSW();
   store.requestPersistence();
-  store.onChange(applyBodyFlags);
+  let warnedStorage = false;
+  store.onChange(() => {
+    applyBodyFlags();
+    if (store.persistFailed && !warnedStorage) toast('Device storage is unavailable. Your run is held in memory. Export a backup before closing this browser.', 10000);
+    warnedStorage = store.persistFailed;
+  });
 }
 
 boot();

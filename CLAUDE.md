@@ -1,4 +1,4 @@
-# Neuro Arcade 2.2: project notes
+# Neuro Arcade 2.3: project notes
 
 Offline-first PWA, vanilla ES modules, static hosting including GitHub Pages subpaths. No runtime dependencies. Preserve old local progress and the existing CSP.
 
@@ -18,8 +18,6 @@ Offline-first PWA, vanilla ES modules, static hosting including GitHub Pages sub
 - `js/checkpoint.js`: bounded versioned snapshots; serializes typed tiles, RNG states, and Sets.
 - `js/game-validation.js`: game snapshot validators; new rooms have validators beside their engines.
 - Each original game retains its pure rules/UI split. `rooms-core.js` and `rooms.js` implement the five new games.
-- `js/reviews.js`: date-based language reviews. Vocabulary progress remains shared across scenarios.
-- `js/speech.js`: installed local voices only; no remote speech fallback.
 - `css/games.css`: layout foundations. `css/theme.css`: shared materials and original game world styling. `css/rooms.css`: new game layouts.
 
 - `js/games/marbleworks-core.js` / `marbleworks.js`: fixed-step circle/segment physics, authored challenges, editor, and free bench. Challenge medals also persist in numeric preferences.
@@ -47,3 +45,9 @@ Curio Cabinet uses `curio-core.js`, `curio.js`, `curio-art.js`, and `css/curio.c
 Horde UI always sets `run.manual=false`, including resumed checkpoints. The pure legacy manual engine remains for old rule regressions, but the UI does not depend on held shooting input. New navigation helpers in `survivor-input.js` commit world coordinates, keep targets on normal pointer release, reject extra pointers, and clear on cancellation/pause/blur/upgrades. Keep lost-pointer-capture after a normal pointer-up from cancelling a committed destination.
 
 The build also excludes the four old Deep Delve runtime paths if an overlay upload leaves them in a repository. They cannot re-enter the precache or change the build stamp.
+
+Lingo is retired. Pure historical language fixtures live in `tools/retired/lingo`; the app contains no language-game loader, card, category, progress row or speech code. Both cafe and dungeon IDs remain in STORED_GAME_IDS for backup compatibility. Cinderpath is now implemented; `docs/DECKBUILDER_PLAN.md` documents its rules.
+
+Cinderpath uses `cinderpath-data.js` (30 cards, 12 relics, enemy intents), `cinderpath-core.js` (pure action engine and strict validator), `cinderpath-art.js`, `cinderpath.js`, and `css/cinderpath.css`. It passed pure and standalone browser checks before catalog registration. Used cards enter their next zone only after effects resolve, so a draw card cannot redraw itself while resolving. Every stable combat boundary conserves one instance of each owned card across draw/hand/discard/exhaust/powersZone. Enemy Ember resolves before any enemy acts; defeated enemies cannot attack. Shop stock, rewards, intentions, route and RNG are checkpointed. Terminal results clear checkpoints and record once. Keep the draw pile view sorted to hide its actual order.
+
+Failed storage writes retain bounded in-memory checkpoints, return false, and keep a separate failure flag until that save succeeds. Successful main-record/settings writes must not clear a checkpoint failure. Backups include the volatile checkpoint. Never imply that a volatile save survives browser closure. Workshop generation must never begin solved, and stage three must terminate rather than advance to stage four. Horde projectile validation requires a bounded hit Set and finite nonnegative damage.

@@ -32,5 +32,5 @@ export function restore(raw, validate) {
     return { state, meta: decode(raw.meta || {}) };
   } catch { return null; }
 }
-export function saveRun(store, id, state, meta) { if (!state || state.over) return; try { store.saveGame(id, snapshot(state, meta)); } catch { /* incomplete or full storage */ } }
+export function saveRun(store, id, state, meta) { if (!state || state.over) return false; try { return store.saveGame(id, snapshot(state, meta)); } catch { return false; } }
 export const saneInt = (x, lo, hi) => Number.isInteger(x) && x >= lo && x <= hi;

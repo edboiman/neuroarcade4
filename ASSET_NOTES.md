@@ -10,7 +10,7 @@ Production prompt set:
 - Forest: moonlit storybook clearing, carved pumpkins, twisted trees, autumn leaves, fireflies, a stone path, and distant warm cottage windows; cozy Halloween atmosphere; no characters or text.
 - City: a miniature seaside town with terraced houses, a railway station, park, harbor boats, roads, and copper roofs; elevated isometric view with tactile wood and ceramic materials; no characters or text.
 
-Final local assets: `assets/arcade-room.webp`, `assets/cafe.webp`, `assets/forest.webp`, `assets/city.webp`.
+Final local assets: `assets/arcade-room.webp`, `assets/forest.webp`, `assets/city.webp`.
 
 Marbleworks and Bannerfall gameplay, room previews, decorations, and vocabulary icons are native Canvas/SVG assets. Horde uses the local painted sprite atlas described below, with native effects and UI. Poppins remains bundled under its included SIL Open Font License in `fonts/OFL.txt`.
 
@@ -30,3 +30,13 @@ The Deep Delve runtime illustration and renderer were removed in 2.1.1. Earlier 
 `assets/curio-objects.webp` is a local 960 × 1152 transparent atlas (five columns, six rows, 192-pixel cells). It contains thirty original painted miniature curios, ten per room. The built-in image-generation tool produced the source. Asset preparation crops each isolated object to its own bounds, packs consistent padded cells, and compresses WebP while retaining alpha. All room frames, shelving, shutters, clock hands, glasshouse framing, lamps, star fields and orrery motifs are native SVG/CSS in the playable interface.
 
 Production prompt: a strict five-column by six-row transparent sprite atlas, thirty isolated standalone objects, no labels, text, backgrounds, shelves, scenery or UI; consistent three-quarter front camera, rich brass reflections, colored glass, carved wood and ceramic; warm upper-left key light and cool fill, clear silhouettes at 64 pixels, full objects inside padded cells. Rows: (1) brass mechanical songbird, pocket watch, scarlet glass bottle, golden key, wooden music box; (2) enamel butterfly, ivory knight, copper bell, magnifying glass, open purple pearl box; (3) potted fern, green glass watering can, seed jar, yellow ceramic snail, pink orchid; (4) teal garden gloves, ruby glass apple, moss terrarium, silver pruning shears, amber honey bottle; (5) brass telescope, crescent moon on pedestal, celestial globe, violet crystals, rolled star chart; (6) blue-sand hourglass, silver star on stand, ceramic owl, armillary sphere, burgundy moon book.
+
+The Lingo café illustration was removed from the runtime in 2.2.1. Its prompt description above remains a historical note.
+
+## Cinderpath 2.3 production art
+
+Final asset: `assets/cinderpath-actors.webp`, 1024 × 768 RGBA, four columns by three rows. Created with the built-in image-generation tool. The final atlas was inspected and resized/compressed to WebP while retaining transparency. Native SVG architecture changes between the Ember Cloister, Verdant Foundry and Starless Choir. Each of the thirty cards has its own native glyph; effects, health, intentions and route controls are live UI.
+
+Production prompt: one transparent 4-column/3-row sprite atlas, twelve separate full-body original dark-fantasy storybook figures in equal padded cells, detailed cloth, brass and slate, warm flame/cool rim light, readable silhouettes; no labels, panels or backgrounds. Row one: ivory-hooded Lanternbearer with lantern and curved sword facing right; ash mite; cinder hound; teal lantern wisp. Row two: brass shield sentinel; thorn-robed green-fire cantor; moss-armored knight; iron abbot with bell hammer. Row three: violet glass stalker; bronze Bellkeeper; crowned root/brass regent with emerald heart; floating Crownless Flame with broken halo and violet mantle. Enemies face left.
+
+Layout correction prompt: preserve twelve designs, poses and exact order; shrink figures inside their cells, center them, and give every complete figure, weapon, flame and root a large uniform transparent margin on every side; no overlaps, cropped heads/feet, stray fragments or grid lines. The corrected atlas is the production asset.

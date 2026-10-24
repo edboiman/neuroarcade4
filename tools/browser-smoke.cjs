@@ -14,14 +14,13 @@ const shot=async name=>{if(process.env.QA_OUTPUT_DIR){fs.mkdirSync(process.env.Q
 page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text().slice(0,300))});page.on('response',r=>{if(r.status()>=400)failRequests.push(r.url()+': '+r.status());});
 await page.goto(base);await page.waitForTimeout(350);
 await shot('arcade-mobile');
-const games=[['blockfit','Block Fit'],['survivor','Holiday Horde'],['estate','Tycoon Row'],['cafe','Lingo'],['signal','Signal Junction'],['workshop','Clockwork Workshop'],['casebook','Casebook'],['echo','Echo Garden'],['logistics','Pocket Logistics'],['marbleworks','Marbleworks'],['conquest','Bannerfall'],['curio','Curio Cabinet']];
+const games=[['cinderpath','Cinderpath'],['blockfit','Block Fit'],['survivor','Holiday Horde'],['estate','Tycoon Row'],['signal','Signal Junction'],['workshop','Clockwork Workshop'],['casebook','Casebook'],['echo','Echo Garden'],['logistics','Pocket Logistics'],['marbleworks','Marbleworks'],['conquest','Bannerfall'],['curio','Curio Cabinet']];
 for(const [id,name]of games){
  try{
  await page.getByRole('button',{name:'Play '+name,exact:true}).click();
  if(await page.locator('.modal').count())throw Error('Unexpected game-entry confirmation');
  await page.locator('.game-overlay').waitFor();
  await page.locator('.game-overlay .go-actions .primary').click();
- if(id==='cafe')await page.getByRole('button',{name:'I already know these',exact:true}).click();
  await page.waitForTimeout(id==='estate'?1800:650);
  if(id==='marbleworks'){
  const box=await page.locator('.mw-canvas').boundingBox();
@@ -59,8 +58,8 @@ for(const [id,name]of games){
 }
 await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('switch',{name:'Larger text',exact:true}).click();await page.getByRole('switch',{name:'Reduce motion',exact:true}).click();await page.getByRole('button',{name:'Back',exact:true}).click();await page.getByRole('button',{name:'Progress',exact:true}).click();await page.getByRole('heading',{name:'Progress',exact:true}).waitFor();console.log('PASS rendered progress');await shot('progress-mobile');await page.getByRole('button',{name:'Back',exact:true}).click();await page.locator('.arcade-header').waitFor();
 console.log('PASS settings and progress');
-await page.evaluate(async()=>{await navigator.serviceWorker.ready;});await page.reload();await page.locator('.arcade-header').waitFor();await context.setOffline(true);await page.reload();await page.locator('.arcade-header').waitFor();console.log('PASS offline reload');await context.setOffline(false);
-const sub=await browser.newContext({viewport:{width:1440,height:1000}});const sp=await sub.newPage();sp.setDefaultTimeout(10000);await sp.goto(base+'/test-subpath/');await sp.locator('.arcade-header').waitFor();await sp.evaluate(async()=>{await navigator.serviceWorker.ready;});await sp.reload();await sp.locator('.arcade-header').waitFor();await sub.setOffline(true);await sp.reload();await sp.getByRole('button',{name:'Settings',exact:true}).click();await sp.getByRole('switch',{name:'Larger text',exact:true}).waitFor();console.log('PASS offline subpath hosting and Settings import');await sub.close();
+await page.evaluate(async()=>{await navigator.serviceWorker.ready;});await page.reload();await page.locator('.arcade-header').waitFor();await context.setOffline(true);await page.reload();await page.locator('.arcade-header').waitFor();console.log('PASS offline reload');await page.getByRole('button',{name:'Play Cinderpath',exact:true}).click();await page.locator('.go-actions .primary').click();await page.locator('.cp-node.available').first().click();await page.getByRole('button',{name:'Pause menu',exact:true}).click();await page.getByRole('button',{name:'Save & leave',exact:true}).click();await page.locator('.arcade-header').waitFor();console.log('PASS Cinderpath offline launch, battle and save');await context.setOffline(false);
+const sub=await browser.newContext({viewport:{width:1440,height:1000}});const sp=await sub.newPage();sp.setDefaultTimeout(10000);await sp.goto(base+'/test-subpath/');await sp.locator('.arcade-header').waitFor();await sp.evaluate(async()=>{await navigator.serviceWorker.ready;});await sp.reload();await sp.locator('.arcade-header').waitFor();await sub.setOffline(true);await sp.reload();await sp.getByRole('button',{name:'Settings',exact:true}).click();await sp.getByRole('switch',{name:'Larger text',exact:true}).waitFor();console.log('PASS offline subpath hosting and Settings import');await sp.getByRole('button',{name:'Back',exact:true}).click();await sp.getByRole('button',{name:'Play Cinderpath',exact:true}).click();await sp.locator('.go-actions .primary').click();await sp.locator('.cp-node.available').first().click();await sp.getByRole('button',{name:'End turn',exact:true}).click();await sp.getByRole('button',{name:'Pause menu',exact:true}).click();await sp.getByRole('button',{name:'Save & leave',exact:true}).click();await sp.locator('.arcade-header').waitFor();console.log('PASS Cinderpath offline subpath combat and checkpoint');await sub.close();
 console.log(JSON.stringify({errors,failRequests}));if(errors.length||failRequests.length)throw Error('Browser errors were recorded');
 }finally{if(browser)await browser.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});

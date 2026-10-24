@@ -1,4 +1,5 @@
 export const CATALOG = [
+  {id:'cinderpath',name:'Cinderpath',category:'Adventure',duration:'15–25 min',minutes:20,world:'ember',tag:'Carry the last light',blurb:'A complete roguelike deck-building expedition. Read enemy intentions, combine thirty upgradeable cards, collect twelve relics, and choose a route through three original areas and their guardians.',trains:['Planning','Adaptation'],accent:'#e3ae73',accent2:'#9d826d',rgb:'227,174,115'},
   {id:'curio',name:'Curio Cabinet',category:'Memory',duration:'3–5 min',minutes:4,world:'cabinet',tag:'A small world to remember',blurb:'Study a cabinet of little treasures, close the shutters, and return each object to its remembered place. Three living rooms, five arrangements, and untimed recall.',trains:['Spatial memory','Observation'],accent:'#d8c194',accent2:'#90b8a3',rgb:'216,193,148'},
   {id:'marbleworks',name:'Marbleworks',category:'Puzzle',duration:'Free pace',minutes:8,world:'atelier',tag:'Build a little chain reaction',blurb:'Arrange wooden rails, spring bumpers and air lifts. Guide a glass marble through six physics challenges or build freely.',trains:['Spatial reasoning','Experimentation'],accent:'#d6b784',accent2:'#8cb5ad',rgb:'214,183,132'},
   {id:'conquest',name:'Bannerfall',category:'Strategy',duration:'20–45 min',minutes:30,world:'atlas',tag:'Thirty territories. One banner.',blurb:'Reinforce, roll for territory, and control six original continents. Conquer a world against three AI rivals.',trains:['Planning','Probability sense'],accent:'#7ebdb6',accent2:'#debd78',rgb:'126,189,182'},
@@ -11,25 +12,6 @@ export const CATALOG = [
     accent: '#ffc83d',
     accent2: '#ff7a18',
     rgb: '255,200,61',
-  },
-  {
-    id: 'cafe', category: 'Learn', duration: '5–10 min', world: 'cafe', minutes: 8,
-    name: 'Lingo',
-    tag: 'Learn a language',
-    blurb: 'Spanish, French or German from zero. Learn a few words, then use them on the job: café, shop, home, station, plane or hotel.',
-    // shortcuts on the home screen: jump straight into one scenario (order matches lingo-scenes.js)
-    quick: [
-      { icon: '☕', label: 'Café', pref: 'scene', value: 0 },
-      { icon: '🛍️', label: 'Shop', pref: 'scene', value: 1 },
-      { icon: '🏠', label: 'Home', pref: 'scene', value: 2 },
-      { icon: '🚆', label: 'Station', pref: 'scene', value: 3 },
-      { icon: '✈️', label: 'Flight', pref: 'scene', value: 4 },
-      { icon: '🛎️', label: 'Hotel', pref: 'scene', value: 5 },
-    ],
-    trains: ['Language learning', 'Memory', 'Quick decisions'],
-    accent: '#c58bff',
-    accent2: '#7c5cff',
-    rgb: '183,148,255',
   },
   {
     id: 'survivor', category: 'Action', duration: '10 min', world: 'forest', minutes: 10,
@@ -61,5 +43,5 @@ export const CATALOG = [
 export const GAME_IDS = CATALOG.map(g => g.id);
 
 // Retired games remain valid in old history and backups, but cannot launch.
-export const RETIRED_GAME_IDS = ['dungeon'];
+export const RETIRED_GAME_IDS = ['dungeon', 'cafe'];
 export const STORED_GAME_IDS = [...GAME_IDS, ...RETIRED_GAME_IDS];

@@ -19,5 +19,5 @@ export function validHorde(g) {
  if(g.pools?.some(p=>!number(p.r,1,300)||!number(p.life,-1,20)||!number(p.cd,-1,20)||!number(p.dmg,0,1000)))return false;
  if(g.modern!==undefined&&typeof g.modern!=='boolean')return false;
  if(g.weaponCd!==undefined&&(!g.weaponCd||!['axes','storm','tome'].every(k=>number(g.weaponCd[k],-1,20))))return false;
- return Array.isArray(g.enemies)&&g.enemies.length<=245&&g.enemies.every(e=>point(e)&&['grunt','swift','tank','swarm','boss'].includes(e.kind)&&number(e.hp,0,10000))&&Array.isArray(g.shots)&&g.shots.length<=600&&g.shots.every(p=>point(p)&&number(p.vx,-1e5,1e5)&&number(p.vy,-1e5,1e5)&&number(p.life,0,100))&&Array.isArray(g.gems)&&g.gems.length<=260&&g.gems.every(p=>point(p)&&number(p.v,0,100))&&(!g.pet||point(g.pet));
+ return Array.isArray(g.enemies)&&g.enemies.length<=245&&g.enemies.every(e=>point(e)&&['grunt','swift','tank','swarm','boss'].includes(e.kind)&&number(e.hp,0,10000))&&Array.isArray(g.shots)&&g.shots.length<=600&&g.shots.every(p=>point(p)&&number(p.vx,-1e5,1e5)&&number(p.vy,-1e5,1e5)&&number(p.life,0,100)&&p.hit instanceof Set&&p.hit.size<=245&&[...p.hit].every(id=>int(id,1,1e9))&&number(p.dmg,0,10000))&&Array.isArray(g.gems)&&g.gems.length<=260&&g.gems.every(p=>point(p)&&number(p.v,0,100))&&(!g.pet||point(g.pet));
 }
