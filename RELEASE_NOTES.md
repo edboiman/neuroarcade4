@@ -1,3 +1,17 @@
+# 2.3: Cinderpath is playable
+
+Added the complete original Lanternbearer expedition to the arcade after standalone engine and browser checks passed. Thirty upgradeable cards, twelve relics, eighteen route stages across three areas, three guardians, visible enemy intentions, Ember/Bastion/Momentum combinations, shops, campfires, events and card removal. Original painted battle characters, unique card glyphs, area-specific native architecture, readable scrolling phone hands, keyboard targeting, reduced-motion effects, inspectable card zones and exact decision saves.
+
+Fixed three review findings: failed checkpoint writes now retain an exportable in-memory run with a visible warning; malformed Horde projectiles cannot pass checkpoint validation; Workshop generation cannot start solved or advance past its final machine. Existing scores, retired-game history and checkpoints remain compatible. Twelve playable games are available.
+
+Validation: 127 tests pass, including 150 complete legal Cinderpath expeditions across three development policies. Standalone and integrated browser tests complete all three areas via touch and keyboard, reload all six decision phases without rerolls, verify exactly one result and checkpoint cleanup, and check two-enemy targeting, defeat, invalid saves and quota recovery. All twelve game smoke paths, offline root/subpath Cinderpath combat, installed upgrades from 2.2.1, and Horde/Curio touch regressions pass. No browser errors or failed asset requests were recorded in the completed checks.
+
+# 2.2.1: retire Lingo and plan a deck-builder
+
+Removed Lingo from the catalog, loader, progress rows, reminders, and offline assets. Removed the empty Learn category and local speech feature. Existing language vocabulary, reviews, sessions, preferences, and checkpoint remain compatible with backup import/export. Pure language regression fixtures are retained under tools only.
+
+Added a proposed original roguelike deck-builder, Cinderpath, in `docs/DECKBUILDER_PLAN.md`. It is a design proposal, not a playable replacement yet. Eleven active games remain.
+
 # 2.2: Curio Cabinet and reliable Horde touch controls
 
 **Curio Cabinet is playable.** Three distinct cabinet frames, thirty detailed painted objects, eighteen authored layouts, five-round seeded collections, and a progression from four to ten objects. Study for ten seconds or choose unlimited study. Recall is untimed. Touch selection, keyboard navigation, and pointer drag/drop share the same placement rules. Peek marks a round as assisted. Whole-arrangement feedback, room animations, separate mode comparisons, saved recall phases, and persistent cabinet medals complete the game.
