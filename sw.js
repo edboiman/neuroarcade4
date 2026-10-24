@@ -1,7 +1,7 @@
 // Offline cache. All files are stored at install time and served cache-first.
 // This worker never contacts any server except to download this app's own files once per update,
 // and it ignores every cross-origin request.
-const VERSION = '69e8298413';
+const VERSION = 'f12823a13a';
 const LEGACY_PREFIX = 'neuro-arcade-';
 const PREFIX = 'neuro-arcade:' + new URL(self.registration.scope).pathname + ':';
 const CACHE = PREFIX + VERSION;
@@ -10,6 +10,7 @@ const PRECACHE = [
   './',
   './assets/arcade-room.webp',
   './assets/cinderpath-actors.webp',
+  './assets/cinderpath-expansion.webp',
   './assets/city.webp',
   './assets/curio-objects.webp',
   './assets/forest.webp',
@@ -40,10 +41,15 @@ const PRECACHE = [
   './js/games/blockfit-core.js',
   './js/games/blockfit.js',
   './js/games/cinderpath-art.js',
+  './js/games/cinderpath-content.js',
   './js/games/cinderpath-core.js',
   './js/games/cinderpath-data.js',
+  './js/games/cinderpath-engine.js',
+  './js/games/cinderpath-journal.js',
+  './js/games/cinderpath-legacy.js',
   './js/games/cinderpath.js',
   './js/games/common.js',
+  './js/games/conquest-art.js',
   './js/games/conquest-core.js',
   './js/games/conquest.js',
   './js/games/curio-art.js',
@@ -52,6 +58,7 @@ const PRECACHE = [
   './js/games/estate-chat.js',
   './js/games/estate-core.js',
   './js/games/estate.js',
+  './js/games/marbleworks-art.js',
   './js/games/marbleworks-core.js',
   './js/games/marbleworks.js',
   './js/games/rng.js',

@@ -1,7 +1,7 @@
 import {s,h} from '../ui.js';
 // Painted characters share an atlas; architecture is native and unique to each area.
-export function actor(sprite,{small=false}={}){return h('span',{class:'cp-actor'+(small?' small':''),style:{'--sx':`${sprite%4*100/3}%`,'--sy':`${Math.floor(sprite/4)*50}%`},'aria-hidden':'true'});}
-export function scene(act){
+export function actor(sprite,{small=false}={}){const expanded=sprite>=12,index=expanded?sprite-12:sprite;return h('span',{class:'cp-actor'+(small?' small':''),style:{'--sx':`${index%4*100/3}%`,'--sy':`${Math.floor(index/4)*(expanded?100:50)}%`,'background-image':`url(assets/${expanded?'cinderpath-expansion':'cinderpath-actors'}.webp)`,'background-size':expanded?'400% 200%':'400% 300%'},'aria-hidden':'true'});}
+export function scene(act,variant=0){
  const colors=[['#15212b','#6a4d3d','#e4ad6b'],['#112a2a','#3e5c49','#acd58f'],['#191c36','#514c70','#c8b4ec']][act];
  const a=s('svg',{viewBox:'0 0 1100 420',preserveAspectRatio:'xMidYMax slice','aria-hidden':'true',class:'cp-architecture'});
  a.append(s('path',{d:'M0 0H1100V420H0Z',fill:colors[0]}));
@@ -11,6 +11,7 @@ export function scene(act){
   if(act===1){a.append(s('path',{d:`M${x+25} 420Q${x+120} 245 ${x+47} 91 M${x+175} 420Q${x+65} 287 ${x+176} 189`,fill:'none',stroke:'#557552','stroke-width':16}));for(let j=0;j<4;j++)a.append(s('ellipse',{cx:x+37+j*13,cy:132+j*38,rx:24,ry:8,fill:'#7b9a69',transform:`rotate(-32 ${x+37+j*13} ${132+j*38})`}));a.append(s('circle',{cx:x+108,cy:230,r:36,fill:'none',stroke:'#8c986d','stroke-width':9}),s('circle',{cx:x+108,cy:230,r:12,fill:'#d6d4a2'}));}
   if(act===2){a.append(s('path',{d:`M${x+40} 345L${x+91} 178L${x+132} 346 M${x+105} 6L${x+105} 85`,fill:'#3a3b62',stroke:'#8a80af','stroke-width':2}),s('path',{d:`M${x+90} 83L${x+105} 60L${x+120} 83L${x+105} 105Z`,fill:'#c4acf0',opacity:.65}));}
  }
+ if(variant){for(let i=0;i<5;i++){const x=75+i*230;if(act===0)a.append(s('path',{d:`M${x} 0V108 M${x-24} 140Q${x-17} 97 ${x} 108Q${x+17} 97 ${x+24} 140Z M${x-30} 143H${x+30}`,stroke:'#cd9c67','stroke-width':5,fill:'#71513b'}));if(act===1){a.append(s('circle',{cx:x,cy:205,r:55,fill:'none',stroke:'#8b996a','stroke-width':12}));for(let k=0;k<8;k++){const t=k*Math.PI/4;a.append(s('path',{d:`M${x} 205L${x+Math.cos(t)*57} ${205+Math.sin(t)*57}`,stroke:'#a5a26e','stroke-width':4}));}}if(act===2){a.append(s('path',{d:`M${x-48} 210Q${x-20} 197 ${x} 210Q${x+20} 197 ${x+48} 210V267Q${x+20} 253 ${x} 267Q${x-20} 253 ${x-48} 267Z`,fill:'#736684',stroke:'#bda1da','stroke-width':2}),s('path',{d:`M${x} 211V267 M${x-48} 237H${x-6} M${x+6} 237H${x+48}`,stroke:'#c1acd1','stroke-width':1}));}}}
  a.append(s('path',{d:'M0 371Q550 327 1100 371V420H0Z',fill:'#131b25'}),s('path',{d:'M0 371Q550 327 1100 371 M0 414H1100 M120 366L40 420 M350 350L315 420 M750 350L785 420 M980 366L1060 420',fill:'none',stroke:colors[2],'stroke-width':2,opacity:.2}));
  for(let i=0;i<24;i++)a.append(s('circle',{cx:(i*131+83)%1100,cy:(i*71+17)%310,r:i%3===0?2:1,fill:colors[2],opacity:.32}));return a;
 }
@@ -46,10 +47,12 @@ const GLYPHS={
  secondwind:'M31 62Q25 13 94 13Q93 61 42 62 M31 69L79 28 M47 53L43 33 M59 43L79 44',
  fervor:'M60 67Q20 46 27 26Q38 11 60 28Q79 9 92 25Q106 43 60 67Z M61 29L49 45H65L56 61',
 };
+const NEW_GLYPHS={charbolt:'dart',emberglass:'expose',pyre:'wildfire',coalfold:'hold',heatsink:'kiln',cindersight:'foresight',phoenix:'fervor',ashmemory:'flow',emberrain:'flashover',vow:'battlecry',temper:'kiln',rivets:'detonate',hammerfall:'hammer',quench:'siphon',towerguard:'bastion',slatesting:'strike',anvilchorus:'chill',shieldwall:'hold',rallyplate:'brace',anchor:'hammer',rebuckle:'hold',steelwill:'bastion',bulwark:'shieldbash',ram:'shieldbash',fortressoath:'riposte',starmark:'nova',stardust:'nova',lance:'strike',orbitguard:'brace',constellation:'nova',comet:'dart',moondraw:'foresight',satellite:'flurry',prismburst:'detonate',eclipse:'chill',astralstep:'quickstep',voidchart:'foresight',afterimage:'flow',moonwell:'mend',gravity:'hold',lunarblade:'strike',starforge:'kiln',timestitch:'flow',aetherweave:'expose',supernova:'nova',northstar:'nova',starbit:'spark',daze:'flow',splinter:'expose',scorch:'kindle',burden:'hold',regret:'fervor'};
 export function motif(path,type='Skill',id=''){
  const a=s('svg',{viewBox:'0 0 120 80','aria-hidden':'true',class:'cp-card-motif'}),color={ember:'#efb276',bastion:'#9fc7bd',momentum:'#c4b6e7'}[path];
  a.append(s('circle',{cx:60,cy:40,r:29,fill:'none',stroke:color,'stroke-width':1,opacity:.4}));
- if(GLYPHS[id]){a.append(s('path',{d:GLYPHS[id],fill:'none',stroke:color,'stroke-width':3,'stroke-linecap':'round','stroke-linejoin':'round'}));return a;}
+ const glyph=GLYPHS[id]||GLYPHS[NEW_GLYPHS[id]];if(NEW_GLYPHS[id]){let hash=0;for(const c of id)hash=(hash*31+c.charCodeAt(0))>>>0;for(let i=0;i<6;i++){const angle=(i*60+hash%60)*Math.PI/180,x=60+Math.cos(angle)*35,y=40+Math.sin(angle)*35;a.append(s('circle',{cx:x,cy:y,r:1+(hash+i)%2,fill:color,opacity:.65}));}}
+ if(glyph){a.append(s('path',{d:glyph,fill:'none',stroke:color,'stroke-width':3,'stroke-linecap':'round','stroke-linejoin':'round'}));return a;}
  if(path==='ember')a.append(s('path',{d:'M60 7Q87 32 80 52Q71 76 48 65Q29 54 45 31Q42 49 53 47Q67 40 60 7Z',fill:color}),s('path',{d:'M59 39Q76 58 61 65Q48 61 59 39Z',fill:'#fce9b6'}));
  else if(path==='bastion')a.append(s('path',{d:'M60 10L85 20V43Q81 60 60 71Q39 60 35 43V20Z',fill:'#2d5053',stroke:color,'stroke-width':3}),s('path',{d:'M60 22V56 M48 36H72',stroke:color,'stroke-width':3}));
  else a.append(s('path',{d:'M24 51Q47 17 78 34L70 23 M94 29Q74 66 41 50L48 63',fill:'none',stroke:color,'stroke-width':4,'stroke-linecap':'round'}));

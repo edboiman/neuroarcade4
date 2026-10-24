@@ -1,6 +1,7 @@
 // Local-only storage. Everything lives in this browser's localStorage; nothing is ever sent anywhere.
 // All data read back (including imported files) is validated and clamped before use.
 import { GAME_IDS, STORED_GAME_IDS } from './catalog.js';
+import {emptyJournal,cleanJournal,recordJournal} from './games/cinderpath-journal.js';
 
 const KEY = 'neuroarcade.v1';
 const SAVE_PREFIX = 'neuroarcade.v1.save.';
@@ -28,6 +29,7 @@ export function defaults() {
     prefs: {},
     seenWeek: 0,
     onboarded: false,
+    cinderpath: emptyJournal(),
   };
 }
 
@@ -37,6 +39,7 @@ export function sanitize(raw) {
   d.created = num(raw.created, 0, 4e12, d.created);
   d.seenWeek = num(raw.seenWeek, 0, 4e12, 0);
   d.onboarded = bool(raw.onboarded, false);
+  d.cinderpath = cleanJournal(raw.cinderpath);
   const st = raw.settings && typeof raw.settings === 'object' ? raw.settings : {};
   d.settings = {
     saver: bool(st.saver, true),
@@ -202,6 +205,8 @@ export const store = {
     mem.onboarded = true;
     write();
   },
+  cinderJournal() { return cleanJournal(mem.cinderpath); },
+  recordCinderpath(run) { mem.cinderpath = recordJournal(mem.cinderpath,run); write(); },
   // Resumable game saves are kept apart from the main record.
   saveGame(id, obj) {
     if (!safeKey(id)) return false;

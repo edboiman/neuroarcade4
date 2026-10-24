@@ -1,5 +1,5 @@
 import * as C from './curio-core.js';
-import {objectArt,roomDecoration} from './curio-art.js';
+import {objectArt,roomDecoration,roomScene} from './curio-art.js';
 import {h,fill} from '../ui.js';
 import {gameTop,overlay,hud} from './common.js';
 import {createLoop} from '../loop.js';
@@ -10,23 +10,25 @@ export function mount(root,ctx){
  let roomIdx=Math.max(0,Math.min(2,Math.round(ctx.store.pref('curio','room',0)))),calm=ctx.store.pref('curio','calm',0)===1;
  let run=old?.state||C.createRun(seed,{room:C.ROOM_IDS[roomIdx],calm});
  if(old){roomIdx=C.ROOM_IDS.indexOf(run.room);calm=run.calm;C.dismissPeek(run);}
- let started=false,paused=false,ov=null,drag=null,ghost=null,suppressClickUntil=0;
+ let started=false,paused=false,ov=null,drag=null,ghost=null,suppressClickUntil=0,placedSlot=-1,sceneRoom=null;
  const round=hud('Round','1 / 5'),score=hud('Score','0'),title=h('h1'),subtitle=h('p'),phase=h('span',{class:'curio-phase'}),clock=h('span',{class:'curio-clock'}),meter=h('i'),pediment=h('div',{class:'curio-decoration'}),grid=h('div',{class:'curio-grid',role:'group','aria-label':'Cabinet positions'}),tray=h('div',{class:'curio-tray',role:'group','aria-label':'Object tray'}),feedback=h('div',{class:'curio-feedback'}),actions=h('div',{class:'curio-actions'}),status=h('p',{class:'curio-status',role:'status','aria-live':'polite'});
+ const scene=h('div',{class:'curio-scenery','aria-hidden':'true'});
  const cabinet=h('div',{class:'curio-cabinet'},pediment,h('div',{class:'curio-shelves'},grid),h('div',{class:'curio-shutters','aria-hidden':'true'},h('i'),h('i')));
  const stage=h('section',{class:'curio-stage'},cabinet);
- const el=h('div',{class:'curio-game'},gameTop({title:'Curio Cabinet',onMenu:pause,right:h('div',{class:'hud-row'},round.el,score.el)}),h('div',{class:'curio-heading'},h('span',{class:'eyebrow'},'A SMALL WORLD TO REMEMBER'),title,subtitle),h('div',{class:'curio-phasebar'},phase,clock,h('div',{class:'curio-timer','aria-hidden':'true'},meter)),stage,h('div',{class:'curio-lower'},tray,actions,status,feedback));root.append(el);
+ const el=h('div',{class:'curio-game'},scene,gameTop({title:'Curio Cabinet',onMenu:pause,right:h('div',{class:'hud-row'},round.el,score.el)}),h('div',{class:'curio-heading'},h('span',{class:'eyebrow'},'A SMALL WORLD TO REMEMBER'),title,subtitle),h('div',{class:'curio-phasebar'},phase,clock,h('div',{class:'curio-timer','aria-hidden':'true'},meter)),stage,h('div',{class:'curio-lower'},tray,actions,status,feedback));root.append(el);
  const save=()=>saveRun(ctx.store,'curio',run,{mode:ctx.mode});
  const active=()=>started&&!paused&&!run.over;
  const recall=()=>active()&&run.phase==='recall';
  const btn=(text,fn,primary=false,disabled=false)=>h('button',{class:'btn'+(primary?' primary':''),type:'button',disabled:disabled?true:null,onclick:fn},text);
  function synchronize(){ctx.playing(active()&&run.phase!=='reveal');if(active()&&['study','shutter','peek'].includes(run.phase)&&!(run.phase==='study'&&run.calm))loop.start();else loop.stop();}
- function act(fn){if(!active())return;fn();save();render();synchronize();}
+ function act(fn){if(!active())return;const before=[...run.placed];fn();placedSlot=run.phase==='recall'?run.placed.findIndex((id,i)=>id!==null&&id!==before[i]):-1;save();render();placedSlot=-1;synchronize();}
  function choose(id){if(!recall()||performance.now()<suppressClickUntil)return;act(()=>C.select(run,id));grid.children[0]?.focus({preventScroll:true});}
  function slotClick(i){if(!recall()||performance.now()<suppressClickUntil)return;if(run.selected!==null)act(()=>C.place(run,i));else if(run.placed[i]!==null)act(()=>C.select(run,run.placed[i]));grid.children[i]?.focus({preventScroll:true});}
  function slotKey(e,i){const delta={ArrowLeft:-1,ArrowRight:1,ArrowUp:-4,ArrowDown:4}[e.key];if(delta===undefined)return;e.preventDefault();grid.children[Math.max(0,Math.min(11,i+delta))]?.focus();}
  function render(){
   const room=C.roomOf(run),visible=active(),showAnswers=visible&&['study','peek','reveal'].includes(run.phase),showPlaced=visible&&run.phase==='recall',result=run.results.at(-1);
-  el.className=`curio-game curio-room-${run.room}`+(visible&&run.phase==='reveal'?' restored':'');
+  el.className=`curio-game curio-room-${run.room}`+(ctx.settings.reduce?' curio-still':'')+(!visible?' curio-asleep':'')+(visible&&run.phase==='reveal'?' restored':'');
+  if(sceneRoom!==run.room){fill(scene,roomScene(run.room));sceneRoom=run.room;}
   stage.classList.toggle('shuttered',visible&&run.phase==='shutter');
   title.textContent=room.name;subtitle.textContent=room.tag;round.set(`${run.round+1} / 5`);score.set(run.score);
   phase.textContent=!visible?'CABINET CLOSED':{study:'STUDY THE ARRANGEMENT',shutter:'PICTURE IT IN YOUR MIND',recall:'PUT THE OBJECTS BACK',peek:'A LITTLE REMINDER',reveal:'THE ARRANGEMENT REVEALED'}[run.phase]||'';
@@ -35,7 +37,7 @@ export function mount(root,ctx){
    const id=showAnswers?run.answer[i]:showPlaced?run.placed[i]:null;
    const wrong=visible&&run.phase==='reveal'&&run.placed[i]!==run.answer[i];
    const selected=showPlaced&&id!==null&&id===run.selected;
-   const cell=h('button',{class:'curio-slot'+(id!==null?' occupied':'')+(selected?' selected':'')+(wrong?' incorrect':''),type:'button',dataset:{slot:i,item:showPlaced&&id!==null?id:''},'aria-label':`Shelf ${Math.floor(i/4)+1}, position ${i%4+1}: ${id===null?'empty':C.itemName(id)}`,'aria-pressed':String(selected),onclick:()=>slotClick(i),onkeydown:e=>slotKey(e,i)},h('span',{class:'slot-number','aria-hidden':'true'},String(i+1)),id!==null?objectArt(id):h('span',{class:'curio-empty','aria-hidden':'true'}),h('small',null,id===null?'':C.itemName(id)));
+   const cell=h('button',{class:'curio-slot'+(id!==null?' occupied':'')+(selected?' selected':'')+(wrong?' incorrect':'')+(placedSlot===i?' just-placed':''),type:'button',dataset:{slot:i,item:showPlaced&&id!==null?id:''},'aria-label':`Shelf ${Math.floor(i/4)+1}, position ${i%4+1}: ${id===null?'empty':C.itemName(id)}`,'aria-pressed':String(selected),onclick:()=>slotClick(i),onkeydown:e=>slotKey(e,i)},h('span',{class:'slot-number','aria-hidden':'true'},String(i+1)),id!==null?objectArt(id):h('span',{class:'curio-empty','aria-hidden':'true'}),h('small',null,id===null?'':C.itemName(id)));
    return cell;
   }));
   const available=run.tray.filter(id=>!run.placed.includes(id));

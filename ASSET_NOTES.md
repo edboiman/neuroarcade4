@@ -40,3 +40,18 @@ Final asset: `assets/cinderpath-actors.webp`, 1024 × 768 RGBA, four columns by 
 Production prompt: one transparent 4-column/3-row sprite atlas, twelve separate full-body original dark-fantasy storybook figures in equal padded cells, detailed cloth, brass and slate, warm flame/cool rim light, readable silhouettes; no labels, panels or backgrounds. Row one: ivory-hooded Lanternbearer with lantern and curved sword facing right; ash mite; cinder hound; teal lantern wisp. Row two: brass shield sentinel; thorn-robed green-fire cantor; moss-armored knight; iron abbot with bell hammer. Row three: violet glass stalker; bronze Bellkeeper; crowned root/brass regent with emerald heart; floating Crownless Flame with broken halo and violet mantle. Enemies face left.
 
 Layout correction prompt: preserve twelve designs, poses and exact order; shrink figures inside their cells, center them, and give every complete figure, weapon, flame and root a large uniform transparent margin on every side; no overlaps, cropped heads/feet, stray fragments or grid lines. The corrected atlas is the production asset.
+
+## Cinderpath 2.4 expansion art
+
+Final local asset: `assets/cinderpath-expansion.webp`, 1024 × 512 RGBA, four columns and two rows. The built-in image-generation tool created original figures; a layout correction preserved their designs while adding transparent cell margins. The final atlas was inspected and resized/compressed to WebP. It is used in live battles and hero selection, and is precached.
+
+Production prompt: eight isolated complete full-body painted fantasy sprites in equal 4×2 cells, bold silhouettes, detailed brass/slate/silk/glass, warm/cool lighting, large transparent margins, no text/grid/backdrop. Top row: Ironbound woman warrior facing right with copper hair, teal scarf, slate/brass armor, forge hammer and shield; Starweaver mage facing right with pale braid, violet/silver robes, crystal constellation and astronomy staff; Ashen Cantor facing left with three brass bell faces and ember ribbons; Briar Heart facing left as a root-covered foundry-stag with emerald core. Bottom row: Night Archivist with floating violet books/crescent mask; red-cloaked Bell Pilgrim with bell cage and blade; brass Forge Scarab with green vent smoke; violet-glass Crystal Sentry with spear and shield. All designs original.
+
+Layout correction prompt: preserve the eight designs, poses, alpha and exact order, reduce each entire figure/weapon/effect to 65% of its original cell size, center it in its equal cell, keep at least 17% transparent margins on every side, complete heads/feet, no clipping or neighboring fragments. The corrected atlas is the packaged asset.
+
+Alternate belfry bells, foundry gears/roots and suspended archive books are native SVG architecture. New card glyphs combine native icon paths and deterministic rune marks. No Slay the Spire artwork or source code is included.
+
+
+## 2.5 native game presentation
+
+`marbleworks-art.js` creates the cached wood/felt atelier and live brass/wood/glass mechanisms in Canvas. `conquest-art.js` creates the atlas in native SVG with shared geographic boundaries, sea routes, terrain motifs and counters. `curio-art.js` adds native SVG architecture and ambient ornaments for the three existing rooms. These are original procedural/code-native assets, use no external images or dependencies, and retain the existing painted Curio object atlas.

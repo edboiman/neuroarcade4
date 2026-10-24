@@ -1,3 +1,5 @@
+import {EXTRA_CARDS,EXTRA_RELICS,EXTRA_ENEMIES} from './cinderpath-content.js';
+export {HEROES,ENCHANTMENTS,POTIONS,POTION,ALTERNATE_AREAS,WAYKEEPERS,CHALLENGES,GLOSSARY} from './cinderpath-content.js';
 // Original Cinderpath content. Effect numbers and card text share one source.
 const e=(kind,value,plus=value)=>({kind,value,plus});
 const card=(id,name,cost,type,target,path,rarity,effects,extra={})=>({id,name,cost,type,target,path,rarity,effects,...extra});
@@ -33,6 +35,12 @@ export const CARDS=[
  card('secondwind','Second Wind',1,'Skill','self','bastion',1,[e('block',8,11),e('draw',1,2)]),
  card('fervor','Burn Bright',0,'Skill','self','momentum',1,[e('loseHp',2),e('draw',2,3)]),
 ];
+CARDS.push(...EXTRA_CARDS);
+const lanternIds=new Set(['kindle','dart','backdraft','flashover','kiln','detonate','wildfire','stoke','siphon','nova','afterglow']);
+const ironIds=new Set(['bastion','hold','shieldbash','riposte','chill','secondwind']);
+CARDS.find(c=>c.id==='stoke').exhaust=true;
+for(const c of CARDS)if(!c.hero)c.hero=lanternIds.has(c.id)?'lantern':ironIds.has(c.id)?'ironbound':'neutral';
+export const PLAYABLE_CARDS=CARDS.filter(c=>!c.unplayable&&!c.temporary);
 export const CARD=Object.fromEntries(CARDS.map(c=>[c.id,c]));
 export const RELICS=[
  {id:'coal',name:'Coal Charm',icon:'✦',text:'Your first attack each battle deals 3 extra damage per hit.'},
@@ -48,6 +56,8 @@ export const RELICS=[
  {id:'silk',name:'Woven Dawn',icon:'≋',text:'Gain 3 block at the start of every turn.'},
  {id:'seed',name:'Dawnseed',icon:'❋',text:'Once per expedition, a lethal blow restores 30 health instead.'},
 ];
+RELICS[0].starter=true;
+RELICS.push(...EXTRA_RELICS);
 export const RELIC=Object.fromEntries(RELICS.map(r=>[r.id,r]));
 const attack=(damage,hits=1,extra={})=>({damage,hits,...extra});
 export const ENEMIES={
@@ -63,14 +73,15 @@ export const ENEMIES={
  root:{name:'The Root Regent',sprite:10,hp:125,boss:true,pattern:[attack(9,1,{block:10}),attack(6,1,{heal:7}),attack(5,3),attack(0,0,{strength:2})]},
  flame:{name:'The Crownless Flame',sprite:11,hp:170,boss:true,pattern:[attack(5,3),attack(10,1,{block:12}),attack(15,1,{weak:1}),attack(0,0,{strength:3})]},
 };
+Object.assign(ENEMIES,EXTRA_ENEMIES);
 export const AREAS=[
  {name:'The Ember Cloister',short:'Ember Cloister',tag:'Keep the last light burning.',boss:'bell',color:'#e3ae73',rgb:'227,174,115',enemies:['mite','hound','wisp']},
  {name:'The Verdant Foundry',short:'Verdant Foundry',tag:'Something grows inside the iron.',boss:'root',color:'#9ecb98',rgb:'158,203,152',enemies:['sentinel','cultist','knight']},
  {name:'The Starless Choir',short:'Starless Choir',tag:'Carry dawn into the dark.',boss:'flame',color:'#bda7e6',rgb:'189,167,230',enemies:['knight','stalker','cultist']},
 ];
-export const NODE_TYPES={battle:{name:'Battle',icon:'⚔'},elite:{name:'Elite',icon:'♜'},boss:{name:'Guardian',icon:'♛'},camp:{name:'Campfire',icon:'♨'},shop:{name:'Merchant',icon:'⚖'},event:{name:'Encounter',icon:'✧'}};
-export function effects(c){const d=CARD[c.id];return d.effects.map(e=>({kind:e.kind,value:c.plus?e.plus:e.value}));}
-export function cardName(c){return CARD[c.id].name+(c.plus?' +':'');}
+export const NODE_TYPES={battle:{name:'Battle',icon:'⚔'},elite:{name:'Elite',icon:'♜'},boss:{name:'Guardian',icon:'♛'},camp:{name:'Campfire',icon:'♨'},shop:{name:'Merchant',icon:'⚖'},event:{name:'Encounter',icon:'✧'},unknown:{name:'Unknown',icon:'?'},treasure:{name:'Treasure',icon:'◆'},ancient:{name:'Waykeeper',icon:'☉'}};
+export function effects(c){const d=CARD[c.id],a=d.effects.map(e=>({kind:e.kind,value:c.plus?e.plus:e.value}));if(c.enchant==='keen')for(const x of a)if(['damage','xDamage'].includes(x.kind))x.value+=2;if(c.enchant==='warded')a.push({kind:'block',value:3});if(c.enchant==='kindled')a.push({kind:'emberAll',value:2});if(c.enchant==='flowing')a.push({kind:'draw',value:1});return a;}
+export function cardName(c){return CARD[c.id].name+(c.plus?' +':'')+(c.enchant?' · '+c.enchant[0].toUpperCase()+c.enchant.slice(1):'');}
 export function cardText(c){const d=CARD[c.id],all=d.target==='all'?' to all enemies':'',phrases=effects(c).map(({kind,value:n})=>({
- damage:`Deal ${n} damage${all}.`,block:`Gain ${n} block.`,ember:`Apply ${n} Ember${all}.`,draw:`Draw ${n}.`,energy:`Gain ${n} energy.`,heal:`Heal ${n} health.`,loseHp:`Lose ${n} health.`,weak:`Apply ${n} Weak.`,vulnerable:`Apply ${n} Vulnerable.`,strength:`Gain ${n} Strength this battle.`,retain:'Keep your remaining block next turn.',emberDamage:`Deal ${n} damage per Ember on the target.`,detonate:`Remove the target’s Ember; deal ${n} damage per stack.`,stoke:`Double the target’s Ember, then add ${n}.`,blockDamage:`Deal damage equal to ${n===1?'your block':n+' × your block'}.`,kiln:`Whenever you apply Ember, gain ${n} block.`,thorns:`When an attack hits your block, return ${n} damage.`,afterglow:`At turn start, apply ${n} Ember to every enemy.`,flow:`Every third card you play each turn draws ${n}.`,cleanse:'Remove your Weak.'
- }[kind]));return phrases.join(' ')+(d.exhaust?' Exhaust.':'')+(d.type==='Power'?' Stays in play this battle.':'');}
+ damage:`Deal ${n} damage${all}.`,block:`Gain ${n} block.`,ember:`Apply ${n} Ember${all}.`,draw:`Draw ${n}.`,energy:`Gain ${n} energy.`,heal:`Heal ${n} health.`,loseHp:`Lose ${n} health.`,weak:`Apply ${n} Weak.`,selfWeak:`Gain ${n} Weak.`,vulnerable:`Apply ${n} Vulnerable.`,strength:`Gain ${n} Strength this battle.`,retain:'Keep your remaining block next turn.',emberDamage:`Deal ${n} damage per Ember on the target.`,detonate:`Remove the target’s Ember; deal ${n} damage per stack.`,stoke:`Double the target’s Ember, then add ${n}.`,blockDamage:`Deal damage equal to ${n===1?'your block':n+' × your block'}.`,kiln:`Whenever you apply Ember, gain ${n} block.`,thorns:`When an attack hits your block, return ${n} damage.`,afterglow:`At turn start, apply ${n} Ember to every enemy.`,flow:`Every third card each turn draws ${n}.`,cleanse:'Remove Weak and battle-only card afflictions.',forge:`Gain ${n} Forge.`,glimmer:`Gain ${n} Glimmer.`,forgedDamage:`Spend all Forge: deal ${n} damage per Forge.`,forgeBlock:`Spend all Forge: gain ${n} block per Forge.`,forgeTurn:`Gain ${n} Forge each turn.`,glimmerTurn:`Gain ${n} Glimmer each turn.`,dexterity:`Gain ${n} Dexterity; each block effect gains that much more.`,xDamage:`Deal ${n} damage per energy spent${all}.`,xBlock:`Gain ${n} block per energy spent.`,xEmber:`Apply ${n} Ember per energy spent${all}.`,emberAll:`Apply ${n} Ember to every enemy.`,burnBlock:`Gain ${n} block per Ember across all enemies.`,scry:`Scry ${n}, then draw 1.`,recover:'Return one card from discard to hand.',emberHit:`Your attacks apply ${n} Ember per hit.`,comet:`Spend all Glimmer: deal ${n} damage per Glimmer to every enemy.`,conjure:`Create ${n} Starlight Shards (0 energy, 4 damage, Exhaust).`,retainHand:'Keep your remaining hand this turn.',improvise:'Create a temporary card from your hero’s pool (never a healing card).',drawTurn:`Draw ${n} extra each turn.`,starsEdge:`Each attack hit gains ${n} damage per 2 stored Glimmer.`
+ }[kind]));if(d.unplayable)phrases.unshift('Unplayable.');if(d.endDamage)phrases.push(`Lose ${d.endDamage} health if held at turn end.`);if(d.glimmerCost)phrases.unshift(`Costs ${d.glimmerCost} Glimmer.`);if(c.enchant==='swift')phrases.push('Costs 1 less energy.');return phrases.join(' ')+(d.retainCard?' Retain.':'')+(d.ethereal?' Ethereal.':'')+(d.innate?' Innate.':'')+(d.exhaust?' Exhaust.':'')+(d.type==='Power'?' Stays in play this battle.':'');}

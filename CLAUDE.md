@@ -1,4 +1,4 @@
-# Neuro Arcade 2.3: project notes
+# Neuro Arcade 2.5: project notes
 
 Offline-first PWA, vanilla ES modules, static hosting including GitHub Pages subpaths. No runtime dependencies. Preserve old local progress and the existing CSP.
 
@@ -48,6 +48,17 @@ The build also excludes the four old Deep Delve runtime paths if an overlay uplo
 
 Lingo is retired. Pure historical language fixtures live in `tools/retired/lingo`; the app contains no language-game loader, card, category, progress row or speech code. Both cafe and dungeon IDs remain in STORED_GAME_IDS for backup compatibility. Cinderpath is now implemented; `docs/DECKBUILDER_PLAN.md` documents its rules.
 
-Cinderpath uses `cinderpath-data.js` (30 cards, 12 relics, enemy intents), `cinderpath-core.js` (pure action engine and strict validator), `cinderpath-art.js`, `cinderpath.js`, and `css/cinderpath.css`. It passed pure and standalone browser checks before catalog registration. Used cards enter their next zone only after effects resolve, so a draw card cannot redraw itself while resolving. Every stable combat boundary conserves one instance of each owned card across draw/hand/discard/exhaust/powersZone. Enemy Ember resolves before any enemy acts; defeated enemies cannot attack. Shop stock, rewards, intentions, route and RNG are checkpointed. Terminal results clear checkpoints and record once. Keep the draw pile view sorted to hide its actual order.
+Cinderpath’s stable entry is `cinderpath-core.js`, re-exporting `cinderpath-engine.js`. `cinderpath-data.js` and `cinderpath-content.js` define 76 playable cards plus six special cards, three heroes, 32 relics, eight potions, enchantments, enemies and area variants. `cinderpath-journal.js` owns pure bounded profile sanitation; only store.js persists it. New saves use schema 2, twelve stops per act, generated card identities, an explicit graph, pending choices and battle-only afflictions. `cinderpath-legacy.js` validates schema-1 checkpoints; migrateRun keeps their existing hand, RNG, health, intentions, offers and six-stop routes. Historical rules/data/bot fixtures live in tools/retired only.
+
+Every stable combat boundary conserves the original battle deckUids plus generated cards across draw/hand/discard/exhaust/powersZone/look. Reward cards can expand the permanent deck without retroactively joining that battle. A resolving card cannot draw itself. Scry/recovery defer other draw triggers until commitment, preventing stale options/duplicate identities. Retain draws five new cards up to ten; Ethereal exhausts before later draws. Forge/Glimmer cap at twelve. Summoned enemies do not act in the phase that spawned them. Terminal results clear checkpoints and record once; runId deduplicates the journal. Keep draw-pile inspectors sorted. Validate exact power keys, typed shop indices and hostile journal identifiers.
+
+Character/challenge belong in the result comparison key. Wins unlock Challenge I–V per hero; all heroes and pools start open. Backups include bounded history/discovery/challenge records, and reset removes them. There are no runtime requests or multiplayer endpoints. Research/adaptation boundaries and actual rules are in docs/CINDERPATH_COMPARISON.md and docs/DECKBUILDER_PLAN.md.
 
 Failed storage writes retain bounded in-memory checkpoints, return false, and keep a separate failure flag until that save succeeds. Successful main-record/settings writes must not clear a checkpoint failure. Backups include the volatile checkpoint. Never imply that a volatile save survives browser closure. Workshop generation must never begin solved, and stage three must terminate rather than advance to stage four. Horde projectile validation requires a bounded hit Set and finite nonnegative damage.
+
+
+2.5 retires `casebook` and `logistics` through RETIRED_GAME_IDS. Keep their data/checkpoints in STORED_GAME_IDS; active catalog/reminders have ten games. Shared historical rules remain in rooms-core for backup compatibility and regression fixtures.
+
+Marbleworks presentation is in marbleworks-art.js, with a cached native Canvas bench and transient non-persisted particles. Physics/collider geometry remains in marbleworks-core. Curio roomScene SVG is independent of run data; do not encode answers in scene nodes or animate hidden objects. All new decorative motion respects reduced motion.
+
+Bannerfall new campaigns use schema 2, finite unique card IDs across hands/deck/discard, defenseDice, tradeToAttack, cardBonusUsed and drawn. Do not consume RNG during migration. Legacy saves retain symbol-only cards. Elimination with 6+ cards switches attack → deploy, blocks placement until <5 cards, then resumes attack after deployment. Preserve the pending advance through this interruption. Turn-start and mid-attack trade rules differ. `conquest-art.js` changes province appearance without changing ADJ. Refer to docs/BANNERFALL_RULES_REVIEW.md.
