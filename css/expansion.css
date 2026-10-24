@@ -4,3 +4,4 @@
 .map-swipe-note{display:none}@media(max-width:760px){.map-swipe-note{display:block;flex:none;margin:0;padding:7px 12px;background:#152b34;color:#9dbac2;font-size:10px;text-align:center}}
 .sv-banner{top:12px;width:max-content;max-width:90%;font-size:12px;font-weight:600;padding:8px 14px;border-radius:7px}.sv-build{bottom:10px}.builder-game button:disabled{opacity:.45;cursor:default}
 .mw-stage{flex:0 0 auto}.mw-canvas{max-height:none;max-width:min(1100px,calc((100dvh - 350px)*1.607));object-fit:fill}@media(max-width:760px){.mw-canvas{max-width:100%}}
+.sv-stop{position:absolute;right:12px;bottom:12px;min-width:58px;min-height:44px;border:1px solid #b8d5bd80;background:#15322de8;color:#dcebd4;border-radius:9px;font:600 12px system-ui;box-shadow:0 3px 12px #0004;touch-action:manipulation;z-index:3}.sv-stop:active{background:#3b5e4c}.theme-chip strong{font-size:12px}.sv .go-card{max-height:calc(100dvh - 40px)}

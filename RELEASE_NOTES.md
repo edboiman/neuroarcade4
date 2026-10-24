@@ -1,3 +1,17 @@
+# 2.2: Curio Cabinet and reliable Horde touch controls
+
+**Curio Cabinet is playable.** Three distinct cabinet frames, thirty detailed painted objects, eighteen authored layouts, five-round seeded collections, and a progression from four to ten objects. Study for ten seconds or choose unlimited study. Recall is untimed. Touch selection, keyboard navigation, and pointer drag/drop share the same placement rules. Peek marks a round as assisted. Whole-arrangement feedback, room animations, separate mode comparisons, saved recall phases, and persistent cabinet medals complete the game.
+
+**Horde uses tap-to-move and independent auto-fire.** One tap commits a world destination; movement continues after the finger lifts and the camera follows. New taps redirect movement. Stop or Space cancels. Optional drag steering uses the whole arena. Old manual-aim checkpoints also migrate to automatic firing, so a second shooting finger is no longer required. Extra fingers, cancelled pointers, pause, backgrounding, and upgrade menus release input ownership correctly. Keyboard steering overrides any touch destination. Enemy contact does not stun either movement or firing.
+
+Validation includes the full original/upgrade/expansion suites, 300 solved Curio collections, all live recall phases, real touch events during point-blank damage, saved manual-aim migration, pointer cancellation, multi-touch, upgrade recovery, a five-round browser collection with touch/keyboard/drag, all twelve game smoke paths, offline root/subpath operation, and installed updates without resetting history.
+
+# 2.1.1: retire Deep Delve
+
+Removed Deep Delve from the game catalog, launch routes, progress rows, reminders, and offline assets. Eleven playable games remain. Earlier scores and checkpoints are preserved in local history/backups. The pure rules engine is retained only as an excluded development fixture for existing regression tests. Catalog copy now derives the game count from the registry.
+
+Added a design proposal for Curio Cabinet in `docs/MEMORY_GAME_PLAN.md`. The replacement is planned, not built or listed as playable.
+
 # 2.1: build, conquer, survive
 
 - **Marbleworks:** six authored, solvable physics challenges and a free-build bench. Place, drag, rotate, and remove wooden rails, spring bumpers, and air lifts. Release a marble, inspect its trail, collect stars, and catch it in the brass cup. Blueprint hints show a working track. Star medals persist across fresh runs and backups.

@@ -14,7 +14,7 @@ const shot=async name=>{if(process.env.QA_OUTPUT_DIR){fs.mkdirSync(process.env.Q
 page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text().slice(0,300))});page.on('response',r=>{if(r.status()>=400)failRequests.push(r.url()+': '+r.status());});
 await page.goto(base);await page.waitForTimeout(350);
 await shot('arcade-mobile');
-const games=[['blockfit','Block Fit'],['dungeon','Deep Delve'],['survivor','Holiday Horde'],['estate','Tycoon Row'],['cafe','Lingo'],['signal','Signal Junction'],['workshop','Clockwork Workshop'],['casebook','Casebook'],['echo','Echo Garden'],['logistics','Pocket Logistics'],['marbleworks','Marbleworks'],['conquest','Bannerfall']];
+const games=[['blockfit','Block Fit'],['survivor','Holiday Horde'],['estate','Tycoon Row'],['cafe','Lingo'],['signal','Signal Junction'],['workshop','Clockwork Workshop'],['casebook','Casebook'],['echo','Echo Garden'],['logistics','Pocket Logistics'],['marbleworks','Marbleworks'],['conquest','Bannerfall'],['curio','Curio Cabinet']];
 for(const [id,name]of games){
  try{
  await page.getByRole('button',{name:'Play '+name,exact:true}).click();
@@ -22,7 +22,6 @@ for(const [id,name]of games){
  await page.locator('.game-overlay').waitFor();
  await page.locator('.game-overlay .go-actions .primary').click();
  if(id==='cafe')await page.getByRole('button',{name:'I already know these',exact:true}).click();
- if(id==='dungeon')await page.getByRole('button',{name:'I am ready',exact:true}).click();
  await page.waitForTimeout(id==='estate'?1800:650);
  if(id==='marbleworks'){
  const box=await page.locator('.mw-canvas').boundingBox();
@@ -38,6 +37,7 @@ for(const [id,name]of games){
  await page.getByRole('button',{name:'End turn',exact:true}).click();
  await page.waitForFunction(()=>document.querySelector('.conquest-side .phase-tag')?.textContent==='YOUR TURN · deploy',{},{timeout:20000});
  }
+ if(id==='curio'){await page.getByRole('button',{name:'I have it — close cabinet',exact:true}).click();await page.waitForTimeout(550);await page.locator('.curio-tray-item').first().click();await page.locator('.curio-slot').first().click();}
  if(id==='blockfit')await page.keyboard.press('ArrowDown');
  if(id==='signal')await page.getByRole('button',{name:'Track 2, junction 1: straight',exact:true}).click();
  if(id==='workshop')await page.getByRole('button',{name:'Conduit row 1, column 1',exact:true}).click();

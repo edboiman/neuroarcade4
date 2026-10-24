@@ -22,17 +22,22 @@ const mime={'.html':'text/html','.js':'application/javascript','.css':'text/css'
   browser=await chromium.launch({executablePath:process.env.BROWSER_EXECUTABLE||undefined,args:['--no-sandbox','--disable-dev-shm-usage','--disable-gpu','--disable-software-rasterizer','--no-zygote'],headless:true});
   const context=await browser.newContext({viewport:{width:412,height:915}}),page=await context.newPage();page.setDefaultTimeout(15000);
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(base);if(process.env.LEGACY_IS_V2){await page.locator('.game-card').first().waitFor();assert.equal(await page.locator('.game-card').count(),10);}else{await page.locator('.card').first().waitFor();assert.equal(await page.locator('.card').count(),5);}
-  await page.evaluate(()=>{const data=JSON.parse(localStorage.getItem('neuroarcade.v1')||'{}');data.onboarded=true;data.seenWeek=0;data.sessions=[{g:'blockfit',t:Date.now(),d:120,s:1234,l:2,a:null,c:true}];localStorage.setItem('neuroarcade.v1',JSON.stringify(data));});
+  await page.goto(base);if(process.env.LEGACY_IS_V2){await page.locator('.game-card').first().waitFor();assert.equal(await page.locator('.game-card').count(),Number(process.env.LEGACY_GAME_COUNT||10));}else{await page.locator('.card').first().waitFor();assert.equal(await page.locator('.card').count(),5);}
+  await page.evaluate(()=>{const data=JSON.parse(localStorage.getItem('neuroarcade.v1')||'{}');data.onboarded=true;data.seenWeek=0;data.sessions=[{g:'blockfit',t:Date.now(),d:120,s:1234,l:2,a:null,c:true},{g:'dungeon',t:Date.now()-1000,d:120,s:987,l:3,a:null,c:true}];localStorage.setItem('neuroarcade.v1.save.dungeon',JSON.stringify({version:2,saved:Date.now(),state:{seed:44},meta:{mode:'standard'}}));localStorage.setItem('neuroarcade.v1',JSON.stringify(data));});
   await page.evaluate(async()=>{await navigator.serviceWorker.ready;});await page.reload();
   if(!process.env.LEGACY_IS_V2)await page.getByRole('heading',{name:'A new week begins',exact:true}).waitFor();
-  console.log(process.env.LEGACY_IS_V2?'Loaded previous 2.0.1 installation with ten games.':'Reproduced legacy installation: five games and blocking weekly entry dialog.');
+  console.log(process.env.LEGACY_IS_V2?'Loaded the previous arcade installation.':'Reproduced legacy installation: five games and blocking weekly entry dialog.');
   release='current';
   await page.evaluate(async()=>{const r=await navigator.serviceWorker.getRegistration();await r.update();});
   await page.getByRole('button',{name:'Games (12)',exact:true}).waitFor();
   assert.equal(await page.locator('.game-card').count(),12);assert.equal(await page.locator('[role="dialog"]').count(),0);
-  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('neuroarcade.v1')).sessions[0].s),1234);
-  console.log('PASS cached five-game install upgrades to twelve games; entry gate removed; score preserved.');
+  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('neuroarcade.v1')).sessions.find(s=>s.g==='blockfit').s),1234);
+  assert.equal(await page.getByRole('button',{name:'Play Deep Delve',exact:true}).count(),0);
+  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('neuroarcade.v1')).sessions.find(s=>s.g==='dungeon')?.s),987);
+  assert.ok(await page.evaluate(()=>localStorage.getItem('neuroarcade.v1.save.dungeon')));
+  await page.getByRole('button',{name:'Progress',exact:true}).click();await page.getByRole('heading',{name:'Progress',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:/Deep Delve/}).count(),0);await page.getByRole('button',{name:'Back',exact:true}).click();await page.locator('.arcade-header').waitFor();
+  await page.evaluate(()=>{const state={s:'game',p:{id:'dungeon',resume:true}};history.pushState(state,'');window.dispatchEvent(new PopStateEvent('popstate',{state}));});await page.locator('.arcade-header').waitFor();
+  console.log('PASS twelve-game update removes Deep Delve routes, cards, and progress rows; earlier scores and checkpoints preserved.');
   await page.getByRole('button',{name:'Play Block Fit',exact:true}).click();await page.locator('.game-overlay').waitFor();assert.equal(await page.locator('.modal').count(),0);
   await page.locator('.go-actions .primary').click();await page.locator('.bf canvas').waitFor();
   overrideVersion='fffffff001';
@@ -41,7 +46,7 @@ const mime={'.html':'text/html','.js':'application/javascript','.css':'text/css'
   console.log('PASS update preserves an active game instead of reloading mid-run.');
   await page.getByRole('button',{name:'Pause menu',exact:true}).click();await page.getByRole('button',{name:'Save & leave',exact:true}).click();
   await page.getByRole('button',{name:'Games (12)',exact:true}).waitFor();
-  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('neuroarcade.v1')).sessions[0].s),1234);
+  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('neuroarcade.v1')).sessions.find(s=>s.g==='blockfit').s),1234);
   assert.ok(await page.evaluate(()=>!!localStorage.getItem('neuroarcade.v1.save.blockfit')));
   console.log('PASS update completes after leaving the game; checkpoint and score preserved.');
   assert.deepEqual(errors,[]);

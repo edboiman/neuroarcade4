@@ -14,7 +14,7 @@ import { SCENES, PACES, sceneById } from '../js/games/lingo-scenes.js';
 import { buildQuiz, choicesFor } from '../js/games/cafe-lesson.js';
 import { mulberry32 } from '../js/games/rng.js';
 import * as es from '../js/games/estate-core.js';
-import * as dg from '../js/games/dungeon-core.js';
+import * as dg from './retired/dungeon-core.js';
 import { median, createSpan } from '../js/checkin.js';
 
 const DAY = 86400000;
@@ -62,7 +62,7 @@ test('overdue warns after 7+ days without a counted session, including never-pla
   assert.ok(ids.includes('cafe'));
   assert.equal(due[0].days, 20);
   assert.ok(ids.includes('estate') && due.find((x) => x.id === 'estate').never, 'a too-short run does not count');
-  assert.ok(ids.includes('dungeon'));
+  assert.ok(!ids.includes('dungeon'), 'retired games never trigger reminders');
   // a brand-new player is not nagged during their first week
   assert.deepEqual(weekly.overdue([mk('blockfit', now - 2 * DAY)], now), []);
 });

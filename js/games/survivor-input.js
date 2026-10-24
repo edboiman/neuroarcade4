@@ -98,3 +98,32 @@ export function substeps(dt, step = 1 / 60, max = 0.25) {
   }
   return out;
 }
+
+// Destination movement is independent from aiming. A tap commits a WORLD point;
+// releasing a finger or the camera following the hero must not move that point.
+export function createNavigation() { return { pointer: null, target: null }; }
+export function navigateDown(st, {id,x,y}, view) {
+  if(st.pointer !== null || !Number.isFinite(x+y))return false;
+  st.pointer=id;
+  st.target=screenToWorld(x,y,view);
+  return true;
+}
+export function navigateMove(st,{id,x,y},view) {
+  if(st.pointer!==id||!Number.isFinite(x+y))return false;
+  st.target=screenToWorld(x,y,view);
+  return true;
+}
+export function navigateUp(st,id,{cancel=false}={}) {
+  if(st.pointer!==id)return false;
+  st.pointer=null;
+  if(cancel)st.target=null;
+  return true;
+}
+export function stopNavigation(st) { st.pointer=null;st.target=null; }
+export function navigationVector(st,hero,speed,dt=1/60) {
+  if(!st.target)return null;
+  const dx=st.target.x-hero.x,dy=st.target.y-hero.y,d=Math.hypot(dx,dy);
+  if(d<=3){st.target=null;return{x:0,y:0};}
+  const magnitude=Math.min(1,d/Math.max(.001,speed*dt));
+  return{x:dx/d*magnitude,y:dy/d*magnitude};
+}

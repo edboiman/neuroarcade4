@@ -209,36 +209,5 @@ function estate(a, b) {
   return scene(defs, ...k);
 }
 
-function dungeon(a, b) {
-  const bg = id('ddbg');
-  const torch = id('ddt');
-  const stone = id('dds');
-  const hole = id('ddh');
-  const gem = id('ddg');
-  const defs = [
-    lg(bg, [[0, '#122542'], [1, '#050a14']]),
-    rg(torch, [[0, '#ffc66b', 0.65], [1, '#ff9a2e', 0]]),
-    lg(stone, [[0, '#3c4b6b'], [1, '#232c42']]),
-    rg(hole, [[0, '#000'], [0.7, '#05070d'], [1, '#141c30']], 0.5, 0.35, 0.65),
-    lg(gem, [[0, '#8fe3ff'], [1, '#2a7dff']]),
-  ];
-  const k = [s('rect', { width: 200, height: 280, fill: url(bg) })];
-  // brick wall
-  for (let r = 0; r < 12; r++) for (let c = -1; c < 7; c++) k.push(s('rect', { x: c * 32 + (r % 2 ? 16 : 0) + 1, y: r * 18 + 1, width: 30, height: 16, rx: 2, fill: url(stone), opacity: 0.55 + ((r * 7 + c * 3) % 5) * 0.06 }));
-  // arch doorway with stairs into darkness
-  k.push(s('path', { d: 'M52 236 V120 a48 48 0 0 1 96 0 V236 Z', fill: '#1a2236' }), s('path', { d: 'M60 236 V122 a40 40 0 0 1 80 0 V236 Z', fill: url(hole) }));
-  for (let i = 0; i < 5; i++) k.push(s('rect', { x: 64 + i * 4, y: 228 - i * 14, width: 72 - i * 8, height: 7, fill: '#3a4766', opacity: 1 - i * 0.18 }));
-  // torches
-  for (const x of [32, 168]) k.push(s('circle', { cx: x, cy: 110, r: 46, fill: url(torch) }), s('rect', { x: x - 3, y: 110, width: 6, height: 20, fill: '#5a3a1e' }), s('path', { d: `M${x} 92 q8 10 0 20 q-8 -10 0 -20 Z`, fill: '#ffcf5c' }), s('path', { d: `M${x} 99 q4 6 0 12 q-4 -6 0 -12 Z`, fill: '#fff4c2' }));
-  // the explorer with a lantern
-  k.push(s('ellipse', { cx: 100, cy: 262, rx: 26, ry: 6, fill: '#000', opacity: 0.5 }));
-  k.push(s('path', { d: 'M100 204 Q124 220 120 260 H80 Q76 220 100 204 Z', fill: '#2f9b6e' }), s('circle', { cx: 100, cy: 218, r: 12, fill: '#226b4e' }), s('ellipse', { cx: 100, cy: 221, rx: 8, ry: 7, fill: '#f2d0b2' }));
-  k.push(s('circle', { cx: 128, cy: 236, r: 22, fill: url(torch) }), s('rect', { x: 124, y: 230, width: 8, height: 11, rx: 2, fill: '#ffe9a0' }));
-  // crystal and spikes
-  k.push(s('path', { d: 'M160 236 l10 -14 l10 14 l-10 22 Z', fill: url(gem) }), s('path', { d: 'M160 236 l10 -14 l0 36 Z', fill: '#fff', opacity: 0.25 }));
-  for (let i = 0; i < 4; i++) k.push(s('path', { d: `M${18 + i * 8} 258 l4 -14 l4 14 Z`, fill: '#c9d1de' }));
-  return scene(defs, ...k);
-}
-
-const MAKERS = { blockfit, cafe, survivor, estate, dungeon };
+const MAKERS = { blockfit, cafe, survivor, estate };
 export const gameArt = (g) => MAKERS[g.id](g.accent, g.accent2);

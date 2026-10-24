@@ -1,6 +1,6 @@
 // Local-only storage. Everything lives in this browser's localStorage; nothing is ever sent anywhere.
 // All data read back (including imported files) is validated and clamped before use.
-import { GAME_IDS } from './weekly.js';
+import { GAME_IDS, STORED_GAME_IDS } from './catalog.js';
 
 const KEY = 'neuroarcade.v1';
 const SAVE_PREFIX = 'neuroarcade.v1.save.';
@@ -48,7 +48,7 @@ export function sanitize(raw) {
   };
   if (Array.isArray(raw.sessions)) {
     for (const s of raw.sessions.slice(-MAX_SESSIONS * 2)) {
-      if (!s || typeof s !== 'object' || !GAME_IDS.includes(s.g)) continue;
+      if (!s || typeof s !== 'object' || !STORED_GAME_IDS.includes(s.g)) continue;
       d.sessions.push({
         g: s.g,
         t: num(s.t, 0, 4e12, 0),
@@ -211,7 +211,7 @@ export const store = {
     }
   },
   loadGame(id) {
-    if (!GAME_IDS.includes(id)) return null;
+    if (!STORED_GAME_IDS.includes(id)) return null;
     const raw = read(SAVE_PREFIX + id);
     try { return JSON.stringify(raw).length <= MAX_SAVE_BYTES ? raw : null; } catch { return null; }
   },
@@ -224,7 +224,7 @@ export const store = {
   },
   exportText() {
     const saves = {};
-    for (const id of GAME_IDS) { const run = this.loadGame(id); if (run) saves[id] = run; }
+    for (const id of STORED_GAME_IDS) { const run = this.loadGame(id); if (run) saves[id] = run; }
     return JSON.stringify({ app: 'neuro-arcade', format: 2, exported: new Date().toISOString(), data: mem, saves }, null, 1);
   },
   importText(text) {
@@ -237,7 +237,7 @@ export const store = {
     }
     if (!parsed || parsed.app !== 'neuro-arcade' || !parsed.data) return { ok: false, error: 'That file is not a Neuro Arcade backup.' };
     mem = sanitize(parsed.data);
-    for (const id of GAME_IDS) { this.clearGame(id); if (parsed.saves && Object.hasOwn(parsed.saves, id)) this.saveGame(id, parsed.saves[id]); }
+    for (const id of STORED_GAME_IDS) { this.clearGame(id); if (parsed.saves && Object.hasOwn(parsed.saves, id)) this.saveGame(id, parsed.saves[id]); }
     write();
     return { ok: true, sessions: mem.sessions.length };
   },
@@ -245,7 +245,7 @@ export const store = {
     mem = defaults();
     try {
       localStorage.removeItem(KEY);
-      for (const g of GAME_IDS) localStorage.removeItem(SAVE_PREFIX + g);
+      for (const g of STORED_GAME_IDS) localStorage.removeItem(SAVE_PREFIX + g);
     } catch {
       /* ignore */
     }

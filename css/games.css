@@ -4,7 +4,7 @@
     radial-gradient(90% 40% at 50% 0%, rgba(var(--ar), .16), transparent 70%),
     var(--bg);
 }
-.bf, .sv, .cf, .es, .dd { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; position: relative; }
+.bf, .sv, .cf, .es { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; position: relative; }
 
 .game-top {
   display: flex; align-items: center; gap: 8px;
@@ -34,6 +34,8 @@
 .go-actions .btn.primary { background: linear-gradient(135deg, var(--a), var(--b)); }
 .howto ul { margin: 8px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
 .hidden { display: none !important; }
+
+@keyframes shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
 
 /* ---------- Block Fit ---------- */
 .bf-wrap { flex: 1 1 auto; min-height: 0; position: relative; display: flex; justify-content: center; align-items: flex-start; padding-top: 4px; }
@@ -66,8 +68,8 @@
 .sv-fill.xp { background: linear-gradient(90deg, #4db4ff, #b794ff); width: 0; }
 .sv-wrap { flex: 1 1 auto; min-height: 0; position: relative; overflow: hidden; margin: 2px 0 0; }
 .sv-wrap.hurt::after { content: ""; position: absolute; inset: 0; box-shadow: inset 0 0 60px rgba(255, 50, 80, .55); pointer-events: none; }
-.sv, .bf, .dd { touch-action: none; }
-.sv .game-overlay, .bf .game-overlay, .dd .game-overlay { touch-action: pan-y; }
+.sv, .bf { touch-action: none; }
+.sv .game-overlay, .bf .game-overlay { touch-action: pan-y; }
 .sv-canvas { display: block; touch-action: none; }
 .sv-banner {
   position: absolute; left: 50%; top: 14%; transform: translate(-50%, 6px); max-width: 84%; text-align: center;
@@ -244,26 +246,6 @@
 .b-lv { color: var(--muted); font-size: .78rem; }
 .rent-list { margin: 6px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 2px; font-size: .88rem; }
 .owner-line { margin-top: 8px; font-weight: 700; }
-
-/* ---------- Deep Delve ---------- */
-.dd-hearts { display: flex; gap: 1px; font-size: .9rem; align-items: center; margin-left: 4px; }
-.dd-prev { display: flex; flex-direction: column; gap: 6px; align-items: center; padding: 4px 14px 6px; font-size: .84rem; text-align: center; color: #dfe6f3; }
-.dd-prev .btn { min-height: 40px; }
-.dd-prevbar { width: 100%; height: 6px; border-radius: 4px; background: rgba(255, 255, 255, .12); overflow: hidden; }
-.dd-prevfill { display: block; height: 100%; background: linear-gradient(90deg, var(--a), var(--b)); }
-.dd-stage { flex: 1 1 auto; min-height: 0; position: relative; display: grid; place-items: center; }
-.dd-canvas { display: block; touch-action: none; border-radius: 10px; }
-.dd-stage.shake { animation: shake .26s; }
-@keyframes shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
-.dd-banner {
-  position: absolute; left: 50%; top: 8px; transform: translate(-50%, 6px); max-width: 88%; text-align: center;
-  padding: 8px 14px; border-radius: 14px; background: rgba(14, 17, 25, .94); border: 1px solid var(--line);
-  font-weight: 700; font-size: .85rem; opacity: 0; pointer-events: none; transition: opacity .18s, transform .18s;
-}
-.dd-banner.show { opacity: 1; transform: translate(-50%, 0); }
-.dd-controls { display: flex; justify-content: center; padding: 6px 12px calc(10px + var(--sab)); }
-.dd-wait { min-height: 52px; padding: 0 28px; display: flex; flex-direction: row; gap: 10px; align-items: center; width: auto; }
-.dd-wait small { font-size: .85rem; font-weight: 650; }
 
 /* ---------- Lingo Café lesson ---------- */
 .cf-lesson { position: absolute; inset: 0; z-index: 6; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: calc(18px + var(--sat)) 20px calc(18px + var(--sab)); background: var(--bg); overflow-y: auto; touch-action: pan-y; }

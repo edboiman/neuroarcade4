@@ -1,4 +1,4 @@
-# Neuro Arcade 2.1: project notes
+# Neuro Arcade 2.2: project notes
 
 Offline-first PWA, vanilla ES modules, static hosting including GitHub Pages subpaths. No runtime dependencies. Preserve old local progress and the existing CSP.
 
@@ -16,7 +16,7 @@ Offline-first PWA, vanilla ES modules, static hosting including GitHub Pages sub
 - `js/hub.js`, `js/miniatures.js`, `css/hub.css`: Games/Progress navigation, category filters, direct launch and saved games.
 - `js/session.js`: local daily seeds and configurable session goals.
 - `js/checkpoint.js`: bounded versioned snapshots; serializes typed tiles, RNG states, and Sets.
-- `js/game-validation.js`: original game snapshot validators; dungeon and new rooms have validators beside their engines.
+- `js/game-validation.js`: game snapshot validators; new rooms have validators beside their engines.
 - Each original game retains its pure rules/UI split. `rooms-core.js` and `rooms.js` implement the five new games.
 - `js/reviews.js`: date-based language reviews. Vocabulary progress remains shared across scenarios.
 - `js/speech.js`: installed local voices only; no remote speech fallback.
@@ -29,7 +29,6 @@ Offline-first PWA, vanilla ES modules, static hosting including GitHub Pages sub
 ## Critical invariants
 
 - Block Fit stays one mode; do not introduce Classic/Puzzle/Twist selectors without a new user request.
-- Dungeon combat: windup marks a tile, next action resolves, then recovery. Moving into adjacency cannot deal an immediate untelegraphed hit. A block charges one two-damage counter. Invalid moves consume no turns. A revealed spike is spent.
 - All game state assignments that start/pause/finish play must call `ctx.playing(true/false)`.
 - Clear a checkpoint before recording a terminal result. Save stable action boundaries and pause/leave states.
 - RNG helper exposes `getState()`; snapshots restore from that state without advancing it.
@@ -40,3 +39,11 @@ Offline-first PWA, vanilla ES modules, static hosting including GitHub Pages sub
 - Documentation and tools are excluded from runtime precaching. Do not add generated test screenshots to the app tree.
 
 Installed updates: `sw.js` waits for a complete precache before activation. Legacy shells without an activation acknowledgement refresh once. Updated clients acknowledge the message and preserve active gameplay. Never await `WindowClient.navigate()` inside activation: navigation fetches wait for activation to complete. Worker behavior is included in the build hash after stripping generated version/list fields.
+
+Deep Delve is retired. Its rules engine remains only in `tools/retired` for historical regression tests, outside the runtime and offline cache. Catalog IDs are playable games; STORED_GAME_IDS also includes retired IDs so existing history/checkpoints survive backup import and export. Keep retired IDs out of cards, progress rows, reminders, and routes. `docs/MEMORY_GAME_PLAN.md` now documents the implemented Curio Cabinet.
+
+Curio Cabinet uses `curio-core.js`, `curio.js`, `curio-art.js`, and `css/curio.css`. Its phase machine is study → shutter → recall → reveal, with a short optional peek. All twelve cabinet slots remain visually identical when empty. Never render the answer in hidden DOM during recall/pause; the tray order must be independently shuffled. Medals live in numeric per-room preferences and survive fresh runs.
+
+Horde UI always sets `run.manual=false`, including resumed checkpoints. The pure legacy manual engine remains for old rule regressions, but the UI does not depend on held shooting input. New navigation helpers in `survivor-input.js` commit world coordinates, keep targets on normal pointer release, reject extra pointers, and clear on cancellation/pause/blur/upgrades. Keep lost-pointer-capture after a normal pointer-up from cancelling a committed destination.
+
+The build also excludes the four old Deep Delve runtime paths if an overlay upload leaves them in a repository. They cannot re-enter the precache or change the build stamp.

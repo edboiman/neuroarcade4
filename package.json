@@ -1,12 +1,12 @@
 {
   "name": "neuro-arcade",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "private": true,
   "type": "module",
   "description": "Offline-first brain-exercise games. No dependencies, no network access.",
   "scripts": {
     "build": "node tools/build.mjs",
-    "test": "node tools/test.mjs && node tools/test-upgrades.mjs && node tools/test-expansion.mjs",
+    "test": "node tools/test.mjs && node tools/test-upgrades.mjs && node tools/test-expansion.mjs && node tools/test-final.mjs",
     "audit": "node tools/audit.mjs",
     "check": "node tools/build.mjs && node tools/audit.mjs && npm test"
   },

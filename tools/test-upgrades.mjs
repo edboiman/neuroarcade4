@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import * as dg from '../js/games/dungeon-core.js';
+import * as dg from './retired/dungeon-core.js';
 import * as es from '../js/games/estate-core.js';
 import * as bf from '../js/games/blockfit-core.js';
 import * as sv from '../js/games/survivor-core.js';
@@ -42,3 +42,26 @@ test('seasonal hazards are telegraphed, dodgeable, and blockable',()=>{const g=s
 test('weekly session goals accept any mix of games and ignore short abandoned attempts',()=>{const now=Date.now();const fake={sessions:()=>[{t:now,g:'signal',c:true,d:8},{t:now,g:'signal',c:false,d:4},{t:now,g:'echo',c:false,d:80}],pref:()=>2};assert.deepEqual(goalProgress(fake,now),{count:2,goal:2,complete:true});});
 test('rail: hold switches stop movement so trains can be staggered',()=>{const g=r.createRoom('signal',1);g.tick=2;g.spawned=12;g.trains=[{id:1,row:0,col:2,target:2}];r.setSwitch(g,0,2);r.setSwitch(g,0,2);assert.equal(g.switches[0],3);r.railTick(g);assert.equal(g.trains[0].col,2);r.setSwitch(g,0,2);r.railTick(g);assert.equal(g.trains[0].col,3);});
 test('the offline manifest includes the version module required by Settings',async()=>{const {readFile}=await import('node:fs/promises');const sw=await readFile(new URL('../sw.js',import.meta.url),'utf8');assert.ok(sw.includes("'./js/version.js'"));});
+test('retirement: Deep Delve cannot launch or trigger reminders, while old history stays valid',async()=>{
+ const {GAMES,byId}=await import('../js/registry.js');
+ const {overdue,rotation}=await import('../js/weekly.js');
+ assert.equal(byId('dungeon'),undefined);
+ assert.ok(!GAMES.some(g=>g.id==='dungeon'));
+ const now=Date.now(),data=sanitize({sessions:[{g:'dungeon',t:now-10*86400000,d:100,s:1200,c:true},{g:'not-a-game',t:now,d:100,s:9,c:true}]});
+ assert.equal(data.sessions.length,1);assert.equal(data.sessions[0].g,'dungeon');
+ assert.ok(!overdue(data.sessions,now).some(g=>g.id==='dungeon'));
+ assert.ok(!rotation(data.sessions,now).remaining.includes('dungeon'));
+});
+test('retirement: old scores and checkpoints survive backup import/export and reset clears archived saves',()=>{
+ const previousStorage=globalThis.localStorage,previousData=store.exportText(),memory=new Map();
+ globalThis.localStorage={getItem:k=>memory.get(k)??null,setItem:(k,v)=>memory.set(k,String(v)),removeItem:k=>memory.delete(k)};
+ try{
+ const backup={app:'neuro-arcade',format:2,data:{sessions:[{g:'dungeon',t:1,d:120,s:678,c:true}]},saves:{dungeon:snapshot(dg.createGame(44)),blockfit:snapshot(bf.createGame(55))}};
+ assert.equal(store.importText(JSON.stringify(backup)).ok,true);
+ assert.equal(store.loadGame('dungeon').state.seed,44);
+ const out=JSON.parse(store.exportText());assert.equal(out.data.sessions[0].s,678);assert.equal(out.saves.dungeon.state.seed,44);assert.deepEqual(out.saves.blockfit,JSON.parse(JSON.stringify(backup.saves.blockfit)));
+ store.addSession({g:'dungeon',t:2,d:100,s:100,c:true});assert.equal(store.sessions().length,1);
+ assert.equal(store.importText(JSON.stringify(out)).ok,true);assert.equal(store.loadGame('dungeon').state.seed,44);
+ store.reset();assert.equal(store.loadGame('dungeon'),null);assert.equal(store.sessions().length,0);
+ }finally{store.importText(previousData);if(previousStorage===undefined)delete globalThis.localStorage;else globalThis.localStorage=previousStorage;}
+});

@@ -4,7 +4,10 @@ export function miniature(g) {
  const art=s('svg',{viewBox:'0 0 400 240',preserveAspectRatio:'xMidYMid slice','aria-hidden':'true'});
  const rect=(x,y,w,h,fill,rx=0)=>s('rect',{x,y,width:w,height:h,fill,rx});
  art.append(rect(0,0,400,240,'#1a3036'),s('circle',{cx:330,cy:30,r:120,fill:g.accent,opacity:.12}));
- if(g.id==='marbleworks'){
+ if(g.id==='curio'){
+  art.append(rect(38,15,324,220,'#6b4c37',32),rect(51,27,298,197,'#2c302a',24),s('path',{d:'M65 94H336 M65 158H336 M65 217H336',stroke:'#c19b6a','stroke-width':7}),s('circle',{cx:200,cy:54,r:22,fill:'#ddcda9',stroke:'#ad8857','stroke-width':5}),s('path',{d:'M200 39V54L212 61',stroke:'#433d31','stroke-width':2}));
+  for(const [id,x,y]of [[0,64,91],[1,149,94],[3,239,92],[4,280,156],[2,93,158],[8,191,157]])art.append(s('svg',{x,y,width:63,height:63,viewBox:`${(id%5)*192} ${Math.floor(id/5)*192} 192 192`},s('image',{href:'assets/curio-objects.webp',width:960,height:1152})));
+ }else if(g.id==='marbleworks'){
   for(let x=20;x<400;x+=30)for(let y=20;y<240;y+=30)art.append(s('circle',{cx:x,cy:y,r:1,fill:'#72938f',opacity:.3}));
   for(const [x,y,x2,y2]of [[-10,45,135,85],[138,100,270,155],[262,173,365,210]])art.append(s('path',{d:`M${x} ${y}L${x2} ${y2}`,stroke:'#ad8059','stroke-width':12,'stroke-linecap':'round'}),s('path',{d:`M${x} ${y-4}L${x2} ${y2-4}`,stroke:'#e5c793','stroke-width':2}));
   art.append(s('circle',{cx:183,cy:104,r:16,fill:'#96d4de',stroke:'#e5fbff','stroke-width':3}),s('circle',{cx:178,cy:99,r:4,fill:'#f4ffff'}),s('path',{d:'M324 187h60l-9 46h-42Z',fill:'#c4a26b'}),s('ellipse',{cx:354,cy:187,rx:30,ry:7,fill:'#253b39',stroke:'#edce92','stroke-width':2}));

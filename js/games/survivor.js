@@ -17,10 +17,12 @@ export function mount(root, ctx) {
   })();
   const activeTheme = () => (themeIdx >= 0 ? THEMES[themeIdx] : themeForDate(new Date()));
   let theme = activeTheme();
-  let manual = store.pref('survivor', 'aim', 0) === 1;
+  let manual = false; // Firing always runs independently from touch movement.
+  let moveStyle=store.pref('survivor','moveStyle',0)===1?1:0;
   const old=ctx.resume?restore(store.loadGame('survivor'),validHorde):null;
   let run = old ? old.state : core.createRun(ctx.seed ?? ((Date.now() ^ 0x5bd1e995) & 0x7fffffff),{duration:600,modern:true});
   core.migrateRun(run);
+  run.manual=false; // Old dual-stick checkpoints migrate to auto-fire as well.
   let classIdx=old?.meta?.heroClass??Math.max(0,Math.min(2,Math.round(store.pref('survivor','heroClass',0))));
   if(![0,1,2].includes(classIdx))classIdx=0;
   if(old && Number.isInteger(old.meta.theme) && old.meta.theme>=-1 && old.meta.theme<THEMES.length){themeIdx=old.meta.theme;theme=activeTheme();}
@@ -46,11 +48,12 @@ export function mount(root, ctx) {
   const hpFill = h('i', { class: 'sv-fill hp' });
   const xpFill = h('i', { class: 'sv-fill xp' });
   const bars = h('div', { class: 'sv-bars' }, h('div', { class: 'sv-bar', role: 'img', 'aria-label': 'Health' }, hpFill), h('div', { class: 'sv-bar thin', role: 'img', 'aria-label': 'Experience' }, xpFill));
-  const canvas = h('canvas', { class: 'sv-canvas', 'aria-label': 'Arena' });
+  const canvas = h('canvas', { class: 'sv-canvas', 'aria-label': 'Arena. Tap a destination to move. Weapons fire automatically.' });
   const c2 = canvas.getContext('2d');
   const banner = h('div', { class: 'sv-banner', role: 'status', 'aria-live': 'polite' });
   const buildHud=h('div',{class:'sv-build','aria-label':'Your weapons'});
-  const wrap = h('div', { class: 'sv-wrap' }, canvas, banner,buildHud);
+  const stopButton=h('button',{class:'sv-stop',type:'button','aria-label':'Stop moving',onclick:()=>{release();draw();}},'Stop');
+  const wrap = h('div', { class: 'sv-wrap' }, canvas, banner,buildHud,stopButton);
   const el = h('div', { class: 'sv' }, top, bars, wrap);
   root.append(el);
 
@@ -172,6 +175,9 @@ export function mount(root, ctx) {
     const ox = cssW / 2 - hero.x * scale + sx;
     const oy = cssH / 2 - hero.y * scale + sy;
     c2.setTransform(dpr * scale, 0, 0, dpr * scale, dpr * ox, dpr * oy);
+    if(navigation.target&&state==='play'){
+      const p=navigation.target;c2.strokeStyle='#b6e5d6';c2.lineWidth=1;c2.globalAlpha=.5;c2.setLineDash([4,6]);c2.beginPath();c2.moveTo(hero.x,hero.y);c2.lineTo(p.x,p.y);c2.stroke();c2.setLineDash([]);c2.globalAlpha=.9;c2.beginPath();c2.ellipse(p.x,p.y,9,5,0,0,7);c2.stroke();c2.fillStyle='#d0eee1';c2.beginPath();c2.arc(p.x,p.y,2,0,7);c2.fill();c2.globalAlpha=1;
+    }
     // scenery
     const cell = 110;
     const x0 = Math.floor((hero.x - run.view.hw - 30) / cell);
@@ -482,34 +488,31 @@ export function mount(root, ctx) {
   // ----- game loop -----
   const keys = new Set();
   const sticks = input.createInput();
+  const navigation=input.createNavigation();
   const camView = () => ({ w: cssW, h: cssH, scale, heroX: run.hero.x, heroY: run.hero.y });
   function release() {
     input.releaseAll(sticks);
+    input.stopNavigation(navigation);
     keys.clear();
   }
-  function inputVec() {
-    const mv = input.moveVector(sticks);
-    if (mv) return mv;
-    let x = 0;
-    let y = 0;
-    if (keys.has('ArrowLeft') || keys.has('a')) x -= 1;
-    if (keys.has('ArrowRight') || keys.has('d')) x += 1;
-    if (keys.has('ArrowUp') || keys.has('w')) y -= 1;
-    if (keys.has('ArrowDown') || keys.has('s')) y += 1;
-    return { x, y };
+  function inputVec(dt=1/60) {
+    let x=(keys.has('ArrowRight')||keys.has('d')?1:0)-(keys.has('ArrowLeft')||keys.has('a')?1:0);
+    let y=(keys.has('ArrowDown')||keys.has('s')?1:0)-(keys.has('ArrowUp')||keys.has('w')?1:0);
+    if(x||y){input.stopNavigation(navigation);input.releaseAll(sticks);return{x,y};}
+    if(moveStyle===0)return input.navigationVector(navigation,run.hero,core.heroSpeed(run),dt)||{x:0,y:0};
+    return input.moveVector(sticks)||{x:0,y:0};
   }
-  function keyAim() {
-    if (!manual) return null;
-    const x = (keys.has('l') ? 1 : 0) - (keys.has('j') ? 1 : 0);
-    const y = (keys.has('k') ? 1 : 0) - (keys.has('i') ? 1 : 0);
-    return x || y ? { x, y } : null;
+  function movementPicker(){
+    const group=h('div',{class:'theme-chips two',role:'group','aria-label':'Movement controls'});
+    fill(group,['Tap destination','Drag stick'].map((name,i)=>h('button',{class:'theme-chip'+(moveStyle===i?' on':''),type:'button','aria-pressed':String(moveStyle===i),onclick:e=>{release();moveStyle=i;store.setPref('survivor','moveStyle',i);for(const b of group.children){b.classList.toggle('on',b===e.currentTarget);b.setAttribute('aria-pressed',String(b===e.currentTarget));}}},h('strong',null,name),h('small',null,i===0?'Tap once. Keep moving after lifting.':'Drag anywhere to steer.'))));
+    return group;
   }
   function frame(dt, now) {
     if (state !== 'play') return;
     // fixed small steps: game speed and fire cadence stay the same at 60, 30 or 15 fps
     for (const h of input.substeps(dt)) {
-      core.step(run, h, inputVec(), input.aimVector(sticks, camView()) || keyAim());
-      if (run.over || run.pending > 0) break;
+      core.step(run, h, inputVec(h), null);
+      if (run.over || run.pending > 0 || run.milestone > 0) break;
     }
     handleEvents(now);
     for (let i = fx.length - 1; i >= 0; i--) {
@@ -532,7 +535,7 @@ export function mount(root, ctx) {
     else if (run.milestone > 0 || run.pending > 0) nextChoice();
   }
   // full frame rate while a finger is down, so aim and movement track the thumb; battery saver otherwise
-  const loop = createLoop(frame, () => (sticks.aim || sticks.move ? 60 : ctx.fps()));
+  const loop = createLoop(frame, () => (navigation.target || sticks.move ? 60 : ctx.fps()));
 
   // milestone rewards come first, then any normal level-up picks, then play resumes
   function nextChoice() {
@@ -548,6 +551,7 @@ export function mount(root, ctx) {
     loop.stop();
     release();
     draw();
+    save();
     ctx.audio.good();
     haptic([20, 30, 20]);
     const ids = core.offerMilestones(run);
@@ -589,6 +593,7 @@ export function mount(root, ctx) {
     loop.stop();
     release();
     draw();
+    save();
     const ids = choices || core.offerChoices(run);
     const card = (id) => {
       const heal = id === 'heal';
@@ -621,8 +626,9 @@ export function mount(root, ctx) {
 
   function start() {
     theme = activeTheme();
-    manual = store.pref('survivor', 'aim', 0) === 1;
-    run.manual = old ? run.manual : manual;
+    manual = false;
+    run.manual = false;
+    release();
     if(!old){
       run.heroClass=classIdx;
       if(classIdx===0){run.up.power=1;run.up.rate=1;run.up.axes=1;}
@@ -635,7 +641,7 @@ export function mount(root, ctx) {
     state = 'play'; ctx.playing(true);
     sprites.clear();
     loop.start();
-    say(`${theme.tagline} ${core.SEASON_RULES[theme.id].name}: watch for marked circles.`, 3200);
+    say(`${old?'Welcome back.':'Tap to move · Auto-fire is on.'} Leave marked danger circles.`, 2400);
     save();
   }
   function end() {
@@ -662,7 +668,7 @@ export function mount(root, ctx) {
     release();
     pauseOv = overlay(el, {
       title: 'Paused',
-      body: h('div', null, h('p', null, 'The horde is waiting.'), buildLine()),
+      body: h('div', null, h('p', null, 'Weapons aim and fire automatically. Choose how you move.'), movementPicker(),buildLine()),
       buttons: [
         { label: 'Save & leave', onclick: () => {save();ctx.exit();} },
         {
@@ -683,34 +689,21 @@ export function mount(root, ctx) {
     const r = canvas.getBoundingClientRect();
     return { id: e.pointerId, x: e.clientX - r.left, y: e.clientY - r.top, w: r.width, manual };
   };
-  canvas.addEventListener('pointerdown', (e) => {
-    if (state !== 'play') return;
+  canvas.addEventListener('pointerdown',e=>{
+    if(state!=='play'||(e.pointerType==='mouse'&&e.button!==0))return;
     e.preventDefault();
-    const took = input.pointerDown(sticks, local(e));
-    if (took === 'aim') {
-      // fire and draw right away instead of waiting for the next frame
-      core.step(run, 1 / 240, inputVec(), input.aimVector(sticks, camView()));
-      handleEvents(performance.now());
-      draw();
-    } else if (took) draw();
-    if (took) {
-      try {
-        canvas.setPointerCapture(e.pointerId);
-      } catch {
-        /* capture is best effort */
-      }
-    }
+    const took=moveStyle===0?input.navigateDown(navigation,local(e),camView()):input.pointerDown(sticks,{...local(e),manual:false});
+    if(took){try{canvas.setPointerCapture(e.pointerId);}catch{}draw();}
   });
-  canvas.addEventListener('pointermove', (e) => {
-    if (state !== 'play') return;
-    // use the newest sample the browser has, not a stale one
-    const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
-    input.pointerMove(sticks, local(evs.length ? evs[evs.length - 1] : e));
+  canvas.addEventListener('pointermove',e=>{
+    if(state!=='play')return;
+    const evs=e.getCoalescedEvents?e.getCoalescedEvents():[],latest=local(evs.length?evs[evs.length-1]:e);
+    if(moveStyle===0)input.navigateMove(navigation,latest,camView());else input.pointerMove(sticks,latest);
   });
-  const lift = (e) => input.pointerUp(sticks, e.pointerId);
-  canvas.addEventListener('pointerup', lift);
-  canvas.addEventListener('pointercancel', lift);
-  canvas.addEventListener('lostpointercapture', lift);
+  canvas.addEventListener('pointerup',e=>{input.navigateUp(navigation,e.pointerId);input.pointerUp(sticks,e.pointerId);});
+  const cancelPointer=e=>{input.navigateUp(navigation,e.pointerId,{cancel:true});input.pointerUp(sticks,e.pointerId);};
+  canvas.addEventListener('pointercancel',cancelPointer);
+  canvas.addEventListener('lostpointercapture',cancelPointer);
   const onHide = () => {
     release();
     if (document.hidden) openPause();
@@ -718,8 +711,10 @@ export function mount(root, ctx) {
   window.addEventListener('blur', release);
   document.addEventListener('visibilitychange', onHide);
   const onKey = (e) => {
+    if(state!=='play')return;
+    if(e.key===' '){e.preventDefault();release();return;}
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'a', 'd', 'w', 's', 'i', 'j', 'k', 'l'].includes(k)) {
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'a', 'd', 'w', 's'].includes(k)) {
       keys.add(k);
       if (state === 'play') e.preventDefault();
     }
@@ -752,22 +747,6 @@ export function mount(root, ctx) {
       paint();
     }
     const desc = h('p', { class: 'theme-desc' });
-    const ctl = h('div', { class: 'theme-chips two', role: 'radiogroup', 'aria-label': 'Aiming' });
-    const ctlDesc = h('p', { class: 'theme-desc' });
-    function paintCtl() {
-      const opts = [
-        ['Auto-aim', '🎯', 'Drag anywhere to move. Your hero shoots the nearest enemy on its own.'],
-        ['Manual aim', '🕹️', 'Left thumb moves. Touch and hold the right side: you fire at your finger for as long as you hold. Shots hit 35% harder.'],
-      ];
-      fill(
-        ctl,
-        opts.map(([n, ic], i) =>
-          h('button', { class: 'theme-chip' + (manual === (i === 1) ? ' on' : ''), type: 'button', role: 'radio', 'aria-checked': manual === (i === 1) ? 'true' : 'false', onclick: () => ((manual = i === 1), store.setPref('survivor', 'aim', i), paintCtl()) }, h('span', null, ic), h('small', null, n)),
-        ),
-      );
-      ctlDesc.textContent = opts[manual ? 1 : 0][2];
-    }
-    paintCtl();
     paint();
     overlay(el, {
       title: 'Holiday Horde',
@@ -778,8 +757,8 @@ export function mount(root, ctx) {
         h('ul', null, h('li', null, 'Build six weapons at once: bow, crescent axes, orbit blades, lightning, ember pools, and shock pulses.'), h('li', null, 'Max a weapon and its matching passive, then collect a chest from an elite or boss to evolve it. Each upgrade lists its recipe.')),
         h('strong',{class:'es-len-h'},'Choose your starting build'),
         h('div',{class:'class-picker',role:'group','aria-label':'Hero class'},[['Ranger','Bow + crescent axes. Faster, stronger shots.'],['Warden','Bow + orbit blades. 150 health and a barrier.'],['Wayfinder','Bow + stormcall. Move and collect faster.']].map(([name,desc],i)=>h('button',{class:'class-card'+(classIdx===i?' on':''),type:'button','aria-pressed':String(classIdx===i),onclick:e=>{classIdx=i;store.setPref('survivor','heroClass',i);for(const b of e.currentTarget.parentElement.children){b.classList.toggle('on',b===e.currentTarget);b.setAttribute('aria-pressed',String(b===e.currentTarget));}}},name,h('small',null,desc)))),
-        ctl,
-        ctlDesc,
+        movementPicker(),
+        h('p',{class:'theme-desc'},'Tap a destination to walk there. Tap again to redirect. Stop or Space cancels movement. Weapons fire automatically.'),
         chips,
         desc,
       ),

@@ -1,7 +1,7 @@
 // Offline cache. All files are stored at install time and served cache-first.
 // This worker never contacts any server except to download this app's own files once per update,
 // and it ignores every cross-origin request.
-const VERSION = '8c0f12567e';
+const VERSION = 'bc38a31e46';
 const LEGACY_PREFIX = 'neuro-arcade-';
 const PREFIX = 'neuro-arcade:' + new URL(self.registration.scope).pathname + ':';
 const CACHE = PREFIX + VERSION;
@@ -11,11 +11,12 @@ const PRECACHE = [
   './assets/arcade-room.webp',
   './assets/cafe.webp',
   './assets/city.webp',
-  './assets/dungeon.webp',
+  './assets/curio-objects.webp',
   './assets/forest.webp',
   './assets/horde-actors.webp',
   './assets/horde-ground.webp',
   './css/base.css',
+  './css/curio.css',
   './css/expansion.css',
   './css/games.css',
   './css/hub.css',
@@ -44,9 +45,9 @@ const PRECACHE = [
   './js/games/common.js',
   './js/games/conquest-core.js',
   './js/games/conquest.js',
-  './js/games/dungeon-art.js',
-  './js/games/dungeon-core.js',
-  './js/games/dungeon.js',
+  './js/games/curio-art.js',
+  './js/games/curio-core.js',
+  './js/games/curio.js',
   './js/games/estate-chat.js',
   './js/games/estate-core.js',
   './js/games/estate.js',
