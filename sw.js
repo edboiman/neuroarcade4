@@ -1,7 +1,7 @@
 // Offline cache. All files are stored at install time and served cache-first.
 // This worker never contacts any server except to download this app's own files once per update,
 // and it ignores every cross-origin request.
-const VERSION = 'f12823a13a';
+const VERSION = 'c613c1073c';
 const LEGACY_PREFIX = 'neuro-arcade-';
 const PREFIX = 'neuro-arcade:' + new URL(self.registration.scope).pathname + ':';
 const CACHE = PREFIX + VERSION;
@@ -19,6 +19,7 @@ const PRECACHE = [
   './css/base.css',
   './css/cinderpath.css',
   './css/curio.css',
+  './css/estate.css',
   './css/expansion.css',
   './css/games.css',
   './css/hub.css',
@@ -39,6 +40,7 @@ const PRECACHE = [
   './js/checkpoint.js',
   './js/game-validation.js',
   './js/games/blockfit-core.js',
+  './js/games/blockfit-input.js',
   './js/games/blockfit.js',
   './js/games/cinderpath-art.js',
   './js/games/cinderpath-content.js',
@@ -55,6 +57,7 @@ const PRECACHE = [
   './js/games/curio-art.js',
   './js/games/curio-core.js',
   './js/games/curio.js',
+  './js/games/estate-board.js',
   './js/games/estate-chat.js',
   './js/games/estate-core.js',
   './js/games/estate.js',

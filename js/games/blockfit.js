@@ -1,5 +1,6 @@
 // Block Fit: touch UI for the rules engine in blockfit-core.js.
 import * as core from './blockfit-core.js';
+import * as Input from './blockfit-input.js';
 import { restore, saveRun } from '../checkpoint.js';
 import { validBlocks } from '../game-validation.js';
 import { h, icon, haptic } from '../ui.js';
@@ -11,6 +12,7 @@ const COLORS = [null, '#38e1ff', '#ffd23f', '#b388ff', '#5af78e', '#ff5d73', '#5
 export function mount(root, ctx) {
   const old=ctx.resume?restore(ctx.store.loadGame('blockfit'),validBlocks):null;
   const g = old ? old.state : core.createGame(ctx.seed ?? (Date.now() & 0x7fffffff));
+  core.setSoft(g,false);
   const save=()=>saveRun(ctx.store,'blockfit',g,{mode:ctx.mode});
   let lastSavePiece=-1;
   let state = 'ready'; // ready | play | paused | over
@@ -23,6 +25,7 @@ export function mount(root, ctx) {
   let dpr = 1;
   let bannerTimer = 0;
   let pauseOv = null;
+  const drag=Input.createDrag();
 
   const score = hud('Score');
   const level = hud('Level', '1');
@@ -33,7 +36,7 @@ export function mount(root, ctx) {
     right: h('div', { class: 'hud-row' }, score.el, level.el, time.el),
   });
 
-  const canvas = h('canvas', { class: 'bf-canvas', 'aria-label': 'Block Fit board' });
+  const canvas = h('canvas', { class: 'bf-canvas', tabIndex:0, 'aria-label': 'Block Fit board. Grab the falling shape to hold and drag it; release to resume falling.' });
   const c2 = canvas.getContext('2d');
   const banner = h('div', { class: 'bf-banner', role: 'status', 'aria-live': 'polite' });
   const wrap = h('div', { class: 'bf-wrap' }, canvas, banner);
@@ -51,6 +54,7 @@ export function mount(root, ctx) {
 
   // ----- layout -----
   function layout() {
+    if(drag.pointer)clearGrab();
     const W = wrap.clientWidth || 320;
     const H = wrap.clientHeight || 520;
     cell = Math.max(10, Math.floor(Math.min(W / 10.4, H / 21.9)));
@@ -205,6 +209,7 @@ export function mount(root, ctx) {
         c2.globalAlpha = 1;
       }
       for (const [x, y] of core.absCells(g.cur)) if (y >= 0) drawCell(bx0 + x * cell, boardTop + y * cell, cell, col);
+      if(Input.grabbed(drag,g)){c2.strokeStyle='#fff1b0';c2.lineWidth=2;for(const [x,y]of core.absCells(g.cur))if(y>=0)c2.strokeRect(bx0+x*cell+1,boardTop+y*cell+1,cell-2,cell-2);}
     }
     // effects
     const now = performance.now();
@@ -285,7 +290,8 @@ export function mount(root, ctx) {
   // ----- game state -----
   function frame(dt) {
     if (state !== 'play') return;
-    core.tick(g, dt * 1000);
+    if(drag.pointer&&drag.pointer.piece!==g.cur)clearGrab();
+    core.tick(g, dt * 1000,{suspendFall:Input.grabbed(drag,g)});
     handleEvents();
     const sig = g.cur.x + ',' + g.cur.y + ',' + g.pieces + ',' + g.cur.cells.join(';') + ',' + (g.hold || '') + g.twist?.kind;
     if (dirty || sig !== lastSig || fxList.length) {
@@ -308,6 +314,7 @@ export function mount(root, ctx) {
   }
   function end() {
     if (state === 'over') return;
+    clearGrab();
     state = 'over'; ctx.playing(false);
     loop.stop();
     draw();
@@ -321,6 +328,7 @@ export function mount(root, ctx) {
   }
   function openPause() {
     if (state !== 'play' || pauseOv) return;
+    clearGrab();stopL();stopR();
     state = 'paused'; ctx.playing(false);
     g.soft=false;save();
     loop.stop();
@@ -345,7 +353,7 @@ export function mount(root, ctx) {
   // ----- input -----
   const act = (fn) => (e) => {
     if (e && e.preventDefault) e.preventDefault();
-    if (state !== 'play') return;
+    if (state !== 'play'||drag.pointer) return;
     fn();
     dirty = true;
   };
@@ -358,7 +366,7 @@ export function mount(root, ctx) {
     };
     button.addEventListener('pointerdown', (e) => {
       e.preventDefault();
-      if (state !== 'play') return;
+      if (state !== 'play'||drag.pointer) return;
       fn();
       dirty = true;
       stop();
@@ -380,56 +388,25 @@ export function mount(root, ctx) {
   bHold.addEventListener('pointerdown', act(() => core.holdPiece(g)));
   bDrop.addEventListener('pointerdown', act(() => { core.hardDrop(g); haptic(14); }));
 
-  let gp = null;
-  canvas.addEventListener('pointerdown', (e) => {
-    if (state !== 'play') return;
-    canvas.setPointerCapture(e.pointerId);
-    gp = { x: e.clientX, y: e.clientY, lx: e.clientX, t: performance.now(), moved: false, acc: 0 };
+  const metrics=()=>({cell,pad,boardTop:Math.round(cell*1.5)+pad});
+  const pointer=e=>{const r=canvas.getBoundingClientRect(),style=getComputedStyle(canvas),bl=parseFloat(style.borderLeftWidth)||0,bt=parseFloat(style.borderTopWidth)||0,br=parseFloat(style.borderRightWidth)||0,bb=parseFloat(style.borderBottomWidth)||0;return{id:e.pointerId,x:(e.clientX-r.left-bl)*cssW/(r.width-bl-br),y:(e.clientY-r.top-bt)*cssH/(r.height-bt-bb),t:performance.now()};};
+  function clearGrab(){const id=Input.cancelDrag(drag,g);canvas.classList.remove('grabbing');if(id!==null&&canvas.hasPointerCapture(id))canvas.releasePointerCapture(id);dirty=true;}
+  canvas.addEventListener('contextmenu',e=>e.preventDefault());
+  canvas.addEventListener('pointerdown',e=>{
+    if(state!=='play'||e.pointerType==='mouse'&&e.button!==0)return;
+    e.preventDefault();if(!Input.beginDrag(drag,g,pointer(e),metrics()))return;
+    canvas.setPointerCapture(e.pointerId);canvas.classList.toggle('grabbing',Input.grabbed(drag,g));dirty=true;
   });
-  canvas.addEventListener('pointermove', (e) => {
-    if (!gp || state !== 'play') return;
-    gp.acc += e.clientX - gp.lx;
-    gp.lx = e.clientX;
-    const step = cell * 0.85;
-    while (gp.acc >= step) {
-      core.move(g, 1);
-      gp.acc -= step;
-      gp.moved = true;
-      dirty = true;
-    }
-    while (gp.acc <= -step) {
-      core.move(g, -1);
-      gp.acc += step;
-      gp.moved = true;
-      dirty = true;
-    }
-    core.setSoft(g, e.clientY - gp.y > cell * 1.6);
-  });
-  const release = (e) => {
-    if (!gp) return;
-    core.setSoft(g, false);
-    const dt = performance.now() - gp.t;
-    const dx = e.clientX - gp.x;
-    const dy = e.clientY - gp.y;
-    if (state === 'play') {
-      if (!gp.moved && Math.hypot(dx, dy) < 12 && dt < 280) core.rotate(g, 1);
-      else if (dy > cell * 2.2 && dt < 300 && Math.abs(dx) < cell * 2) {
-        core.hardDrop(g);
-        haptic(14);
-      }
-    }
-    dirty = true;
-    gp = null;
-  };
-  canvas.addEventListener('pointerup', release);
-  canvas.addEventListener('pointercancel', () => {
-    core.setSoft(g, false);
-    gp = null;
-  });
+  canvas.addEventListener('pointermove',e=>{if(state!=='play')return;if(Input.moveDrag(drag,g,pointer(e),metrics())){e.preventDefault();dirty=true;}});
+  canvas.addEventListener('pointerup',e=>{if(Input.endDrag(drag,g,pointer(e),metrics())){e.preventDefault();clearGrab();save();}});
+  canvas.addEventListener('pointercancel',e=>{if(drag.pointer?.id===e.pointerId)clearGrab();});
+  canvas.addEventListener('lostpointercapture',e=>{if(drag.pointer?.id===e.pointerId)clearGrab();});
 
   function onKey(e) {
     if (state !== 'play') return;
     const k = e.key;
+    if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','x','z',' ','c'].includes(k))return;
+    clearGrab();
     if (k === 'ArrowLeft') core.move(g, -1);
     else if (k === 'ArrowRight') core.move(g, 1);
     else if (k === 'ArrowUp' || k === 'x') core.rotate(g, 1);
@@ -444,6 +421,8 @@ export function mount(root, ctx) {
   function onKeyUp(e) {
     if (e.key === 'ArrowDown') core.setSoft(g, false);
   }
+  const onBlur=()=>{clearGrab();stopL();stopR();};
+  window.addEventListener('blur',onBlur);
   document.addEventListener('keydown', onKey);
   document.addEventListener('keyup', onKeyUp);
 
@@ -458,7 +437,7 @@ export function mount(root, ctx) {
       'div',
       { class: 'howto' },
       h('p', null, 'Fit the falling shapes into complete rows. You have three minutes.'),
-      h('ul', null, h('li', null, 'Drag sideways to move, tap to rotate.'), h('li', null, 'Flick down to drop. Hold a finger low to fall faster.'), h('li', null, 'The buttons below do the same things.'), h('li', null, 'From level 2, a red frame means a twist is active. Watch the banner and adapt.')),
+      h('ul', null, h('li', null, 'Grab the falling shape to hold it. Drag sideways or down; release to let it fall.'), h('li', null, 'Tap to rotate. Swipe empty board space sideways to steer or flick down to drop.'), h('li', null, 'The buttons below do the same things.'), h('li', null, 'From level 2, a red frame means a twist is active. Watch the banner and adapt.')),
     ),
     buttons: [{ label: old ? 'Continue game' : 'Start', kind: 'primary', onclick: start }],
   });
@@ -466,11 +445,13 @@ export function mount(root, ctx) {
   return {
     destroy() {
       if(state!=='ready'&&state!=='over')save();
+      clearGrab();
       loop.destroy();
       ro.disconnect();
       stopL();
       stopR();
       clearTimeout(bannerTimer);
+      window.removeEventListener('blur',onBlur);
       document.removeEventListener('keydown', onKey);
       document.removeEventListener('keyup', onKeyUp);
     },

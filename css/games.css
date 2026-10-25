@@ -194,3 +194,4 @@
 .rent-list { margin: 6px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 2px; font-size: .88rem; }
 .owner-line { margin-top: 8px; font-weight: 700; }
 
+.bf-canvas{cursor:grab;-webkit-touch-callout:none}.bf-canvas.grabbing{cursor:grabbing}

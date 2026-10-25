@@ -27,7 +27,7 @@ export const CATALOG = [
     id: 'estate', category: 'Strategy', duration: '10–25 min', world: 'city', minutes: 20,
     name: 'Tycoon Row',
     tag: 'Strategy',
-    blurb: 'Race three chatty rivals around a full 40-square board. Buy deeds, auction, build on full sets and finish richest.',
+    blurb: 'Travel a 3D world-city board against three rivals. Buy twenty-two city deeds, collect country sets, develop your properties and finish richest.',
     trains: ['Planning', 'Probability sense', 'Risk and reward'],
     accent: '#35e6a0',
     accent2: '#16a3a8',

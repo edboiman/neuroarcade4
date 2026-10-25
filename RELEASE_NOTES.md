@@ -1,3 +1,35 @@
+# 2.6: Held blocks, a real cup landing and world cities
+
+Fixed Block Fit’s direct manipulation: grab the active shape, hold it while aiming, drag sideways/down through legal cells and release to resume gravity/locking. The session clock continues. Tap rotation, empty-board steering/flicks, keyboard controls and the reserve Hold button remain. Extra pointers cannot steal input; cancellation, lost capture, pause, blur and resize release it safely. Input is transient and does not enter saves.
+
+Replaced Marbleworks’ rectangular target detection with a swept downward crossing through the opening, accounting for marble radius. Metal rim, walls and base now collide; side/bottom impacts and below-rim proximity do not award delivery. Removed the old near-cup rail-collision exemption. Corrected the authored end tracks in challenges 3/4 and the final rail hint in challenge 6, then checked all six three-star deliveries at 15/30/60/120 fps. Existing medals/tracks remain.
+
+Tycoon Row now uses twenty-two real-world city deeds in eight country groups. The 3D board is built from projected geometry with top/front/side faces, an original miniature skyline, developed properties and standing pawns. Added zoom and an accessible city/space inspector. A separate console keeps dice, money, chat and purchase controls readable. Tile IDs, economic values, AI/rent/build/auction rules and old save state are preserved. The city names are geographic themes, not live property valuations.
+
+Validation: 168 tests; 36 full paired Tycoon campaigns reproduce the original economic outcomes; real browser touch grabs, cancellation/extra fingers, blur/resize, keyboard/reserve Hold, actual marble delivery, 320px/desktop city layouts, label fit, purchase and legacy hotel development; ten-game smoke, offline root/subpath and installed upgrade paths.
+
+# 2.5: A richer atelier, cabinet and atlas
+
+Marbleworks keeps its physics and six authored challenges. The playable bench now has wood grain, inset rulers, brass fasteners, layered rails, mechanical spring bumpers, animated air-lift turbines/currents, a rolling glass highlight, collection particles and a delivery finish. Its cached scenery keeps decorative work out of the per-frame background path; reduced motion disables ambient effects while physics continues.
+
+Curio Cabinet keeps its objects, arrangements and recall rules. Its rooms now have architectural scenery: bookcases/leaded windows/pendulum in the study, greenhouse ribs/light/foliage in the glasshouse, and a dome/constellations/orrery in the observatory. Cabinet joinery, arched niches, shelf shadows, hinged shutters and placement feedback add depth. Scenery is independent of answers; pausing still hides them.
+
+Bannerfall has an etched atlas with irregular shared province boundaries, flags, terrain motifs, legal-target outlines, dice pips, card faces, phase steps, a territory finder and whole-map controls. Rule corrections add a finite territory/Wild deck, chosen card sets and owned-territory bonuses, mandatory trades after elimination, deployment before attacks resume, selectable attack dice, a defense preference, and selectable extra capture movement. Fresh games use thirty initial troops per banner. Legacy campaigns keep their old deployment, hand identities and RNG. The in-game rules and docs explain deliberate differences from Risk.
+
+Removed Casebook and Pocket Logistics from the collection and reminders, preserving their historical data and checkpoints in backups. Ten active games remain. Cinderpath’s expanded release and all other games are retained.
+
+Validation: 155 engine/data/security/reliability tests; finite-card conservation across 100 additional full AI campaigns; touch-built marble delivery; three room layouts at 320px/desktop; actual trade, capture, deploy, advance and fortify controls; exact reloads; reduced motion; the wider arcade’s touch/save/offline/update checks.
+
+# 2.4: Cinderpath — The deeper climb
+
+Expanded the solo game after comparing the prior build with Mega Crit’s official descriptions of Slay the Spire 2. Three original heroes with distinct starters/resources and card pools; 76 playable cards plus six special definitions; 32 relics; eight potions with a saved belt; five independent card enchantments; two battle-only afflictions, temporary statuses and permanent curses. Added X costs, Retain, Ethereal, Innate, Scry, recovery and generated cards.
+
+New expeditions use three twelve-stop acts with real seeded path connections, unknown rooms, treasure/relic choices, ten event types and act-entry Waykeeper bargains. Six possible environments and guardians, 17 enemy definitions, Armor/Thorns, summons and awakening phases add encounter variety. Added two painted heroes and six painted enemies/bosses, native card glyphs, modified-cost displays, resource bars and a glossary.
+
+A local chronicle tracks thirty terminal runs, final decks/relics, discoveries, story fragments and six challenge settings per hero. All heroes/pools are open immediately. Optional seed entry supports replay. Existing 2.3 checkpoints retain their original routes and current decision through a strict migration. Backup/import/reset include the chronicle. The wider arcade still has twelve games.
+
+Validation covers 143 tests, 180 legal-policy expeditions, exact old/new snapshot boundaries, three full touch/keyboard browser victories, focused choice/potion/status/corrupt-save/quota checks, twelve-game smoke paths, offline root/subpath combat and installed updates. Policy win rates are not human-player predictions. Online co-op and commercial content-scale parity are outside this offline release.
+
 # 2.3: Cinderpath is playable
 
 Added the complete original Lanternbearer expedition to the arcade after standalone engine and browser checks passed. Thirty upgradeable cards, twelve relics, eighteen route stages across three areas, three guardians, visible enemy intentions, Ember/Bastion/Momentum combinations, shops, campfires, events and card removal. Original painted battle characters, unique card glyphs, area-specific native architecture, readable scrolling phone hands, keyboard targeting, reduced-motion effects, inspectable card zones and exact decision saves.

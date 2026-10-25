@@ -1,4 +1,4 @@
-# Neuro Arcade 2.5: project notes
+# Neuro Arcade 2.6: project notes
 
 Offline-first PWA, vanilla ES modules, static hosting including GitHub Pages subpaths. No runtime dependencies. Preserve old local progress and the existing CSP.
 
@@ -62,3 +62,10 @@ Failed storage writes retain bounded in-memory checkpoints, return false, and ke
 Marbleworks presentation is in marbleworks-art.js, with a cached native Canvas bench and transient non-persisted particles. Physics/collider geometry remains in marbleworks-core. Curio roomScene SVG is independent of run data; do not encode answers in scene nodes or animate hidden objects. All new decorative motion respects reduced motion.
 
 Bannerfall new campaigns use schema 2, finite unique card IDs across hands/deck/discard, defenseDice, tradeToAttack, cardBonusUsed and drawn. Do not consume RNG during migration. Legacy saves retain symbol-only cards. Elimination with 6+ cards switches attack → deploy, blocks placement until <5 cards, then resumes attack after deployment. Preserve the pending advance through this interruption. Turn-start and mid-attack trade rules differ. `conquest-art.js` changes province appearance without changing ADJ. Refer to docs/BANNERFALL_RULES_REVIEW.md.
+
+
+2.6: blockfit-input.js owns transient pointer identity and direct-grab state. `tick(g,dt,{suspendFall})` still advances elapsed time before suspending gravity/lock; never persist a pointer or a frozen flag. Grabs follow screen-space intent and only move down through fits(). Buttons/swipes retain rule twists.
+
+Marbleworks `CUP` and entersCup() define a swept downward opening crossing with full radius clearance. Cup sides/rim/base are real colliders. Never restore the old rectangular delivery zone or disable rails based on x near the cup. Blueprints 3/4/6 were adjusted; preserve old medals and user tracks.
+
+Tycoon city names/country groups retain the exact 40 indices, group membership and numeric balance. estate-board.js owns native projected SVG geometry and transient pawn placement; estate.js still drives core events/actions. Historical logs can retain prior street names. Do not rewrite saved ownership or invent live real-estate prices. Legacy reference engine is tools/retired/estate-v25-core.js.

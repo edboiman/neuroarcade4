@@ -125,7 +125,7 @@ function touch(g) {
   }
 }
 
-export function tick(g, dtMs) {
+export function tick(g, dtMs, {suspendFall=false} = {}) {
   if (g.over) return;
   g.elapsed += dtMs;
   if (g.elapsed >= TIME_LIMIT_MS) {
@@ -134,6 +134,7 @@ export function tick(g, dtMs) {
     g.reason = 'time';
     return;
   }
+  if(suspendFall)return; // A direct grab holds the piece; the session clock keeps running.
   if (grounded(g)) {
     g.lockMs += dtMs;
     if (g.lockMs >= LOCK_DELAY_MS) lock(g);
@@ -178,6 +179,16 @@ export function rotate(g, dir = 1) {
     }
   }
   return false;
+}
+
+export function dragDown(g, rows) {
+  if(g.over||!Number.isFinite(rows))return 0;
+  let moved=0;
+  for(let i=0;i<Math.min(ROWS,Math.floor(rows));i++){
+    if(!fits(g.board,g.cur.cells,g.cur.x,g.cur.y+1))break;
+    g.cur.y++;g.score++;moved++;
+  }
+  return moved;
 }
 
 export function setSoft(g, on) {

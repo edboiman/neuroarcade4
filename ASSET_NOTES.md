@@ -55,3 +55,8 @@ Alternate belfry bells, foundry gears/roots and suspended archive books are nati
 ## 2.5 native game presentation
 
 `marbleworks-art.js` creates the cached wood/felt atelier and live brass/wood/glass mechanisms in Canvas. `conquest-art.js` creates the atlas in native SVG with shared geographic boundaries, sea routes, terrain motifs and counters. `curio-art.js` adds native SVG architecture and ambient ornaments for the three existing rooms. These are original procedural/code-native assets, use no external images or dependencies, and retain the existing painted Curio object atlas.
+
+
+## 2.6 world-city board
+
+`estate-board.js` creates the original oblique 3D board, city-name tiles, extruded miniature buildings, streets/parks, board thickness and standing pawns in native SVG. No remote assets, WebGL dependency or image generation was needed. City/country names are real geographic labels; prices and development values remain fictional game data.
