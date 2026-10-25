@@ -881,10 +881,10 @@ test('Tycoon: the board is a standard 40-square loop', () => {
   for (const g of es.GROUPS) assert.ok(es.GROUP_TILES[g.id].length >= 2 && es.GROUP_TILES[g.id].length <= 3);
   for (const t of es.TILES.filter((x) => x.type === 'prop')) {
     assert.ok(t.rent.every((r, i) => i === 0 || r > t.rent[i - 1]), 'rent rises with buildings: ' + t.name);
-    assert.ok(t.short.length <= 7, 'short name fits on a square: ' + t.short);
+    assert.ok(t.short.length <= 10, 'short name fits on a square: ' + t.short);
   }
-  // the top and bottom rows have the narrowest squares
-  for (const t of es.TILES) if ((t.i >= 1 && t.i <= 9) || (t.i >= 21 && t.i <= 29)) assert.ok(t.short.length <= 6, 'narrow square label: ' + t.short);
+  // The projected board uses uniform city spaces; full names stay in the deed inspector.
+  for (const t of es.TILES) if ((t.i >= 1 && t.i <= 9) || (t.i >= 21 && t.i <= 29)) assert.ok(t.short.length <= 10, 'city square label: ' + t.short);
   assert.equal(new Set(es.TILES.map((t) => t.name).filter((n) => n !== 'Wildcard')).size, 34);
 });
 
