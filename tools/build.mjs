@@ -11,18 +11,12 @@ for (const f of files) {
   hash.update(f);
   hash.update(readFileSync(join(root, f)));
 }
-// Include worker behavior without its generated stamp or file list (no circular hash).
-const workerLogic = readFileSync(join(root, 'sw.js'), 'utf8')
-  .replace(/const VERSION = '[^']*';/, "const VERSION = 'BUILD';")
-  .replace(/\/\*PRECACHE_START\*\/[\s\S]*?\/\*PRECACHE_END\*\//, 'PRECACHE');
-hash.update(workerLogic);
 const version = hash.digest('hex').slice(0, 10);
 
-// version.js is excluded from the content hash to avoid a circular hash, but must be cached.
-const list = ['./', ...files.map((f) => './' + f), './js/version.js'].map((f) => `  '${f}'`).join(',\n');
+const list = ['./', ...files.map((f) => './' + f)].map((f) => `  '${f}'`).join(',\n');
 let sw = readFileSync(join(root, 'sw.js'), 'utf8');
 sw = sw.replace(/const VERSION = '[^']*';/, `const VERSION = '${version}';`);
 sw = sw.replace(/\/\*PRECACHE_START\*\/[\s\S]*?\/\*PRECACHE_END\*\//, `/*PRECACHE_START*/\n${list}\n  /*PRECACHE_END*/`);
 writeFileSync(join(root, 'sw.js'), sw);
 writeFileSync(join(root, 'js/version.js'), `export const VERSION = '${version}';\n`);
-console.log(`Built version ${version} with ${files.length + 2} offline files.`);
+console.log(`Built version ${version} with ${files.length + 1} offline files.`);

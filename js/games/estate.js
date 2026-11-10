@@ -1,8 +1,5 @@
 // Tycoon Row: board UI for estate-core.js. Rivals move on their own, talk in a chat feed, and wait on you for decisions.
 import * as core from './estate-core.js';
-import {createEstateBoard} from './estate-board.js';
-import { restore, saveRun } from '../checkpoint.js';
-import { validEstate } from '../game-validation.js';
 import { PERSONAS } from './estate-chat.js';
 import { h, s as svgEl, haptic, fill } from '../ui.js';
 import { gameTop, hud, overlay } from './common.js';
@@ -21,12 +18,26 @@ function dieArt(n, rolling = false) {
 }
 const TILE_EMOJI = { start: '🏁', jail: '🔒', park: '🧺', goto: '👮', wild: '❓', tax: '💸', station: '🚇', utility: '💡' };
 
+// board index (0 = Payday, bottom-right, clockwise) to grid column and row on the 11 x 11 grid
+function cellOf(i) {
+  if (i <= 10) return [10 - i, 10];
+  if (i <= 20) return [0, 20 - i];
+  if (i <= 30) return [i - 20, 0];
+  return [10, i - 30];
+}
+// which edge a square sits on decides where its color band goes (always on the inner edge, toward the middle)
+function sideOf(i) {
+  const [c, r] = cellOf(i);
+  if (r === 10 && c > 0 && c < 10) return 'bottom';
+  if (r === 0 && c > 0 && c < 10) return 'top';
+  if (c === 0 && r > 0 && r < 10) return 'left';
+  if (c === 10 && r > 0 && r < 10) return 'right';
+  return 'corner';
+}
 const money = (n) => '$' + n.toLocaleString();
 
 export function mount(root, ctx) {
   const store = ctx.store;
-  const old=ctx.resume?restore(store.loadGame('estate'),validEstate):null;
-  const save=()=>{if(s)saveRun(store,'estate',s,{mode:ctx.mode});};
   let diff = Math.max(1, Math.min(3, Math.round(store.pref('estate', 'diff', 2))));
   let rounds = (() => {
     const r = Math.round(store.pref('estate', 'rounds', core.MAX_ROUNDS));
@@ -36,43 +47,106 @@ export function mount(root, ctx) {
   let dead = false;
   let paused = false;
   let driving = false;
-  let fast = store.pref('estate','fast',1)===1;
+  let fast = false;
   let state = 'ready'; // ready | play | paused | over
   let pauseOv = null;
   let reactReady = true;
 
   const round = hud('Round', '1/' + rounds);
   const worth = hud('Your cash', money(core.START_CASH));
-  const speedBtn = h('button', { class: 'icon-btn es-speed', type: 'button', 'aria-label': 'Speed', onclick: () => ((fast = !fast), (speedBtn.textContent = fast ? '2×' : '1×'), store.setPref('estate','fast',fast?1:0)) }, fast?'2×':'1×');
+  const speedBtn = h('button', { class: 'icon-btn es-speed', type: 'button', 'aria-label': 'Speed', onclick: () => ((fast = !fast), (speedBtn.textContent = fast ? '2×' : '1×')) }, '1×');
   const top = gameTop({ title: 'Tycoon Row', onMenu: () => openPause(), right: h('div', { class: 'hud-row' }, speedBtn, round.el, worth.el) });
 
   const chips = h('div', { class: 'es-players' });
-  const art=createEstateBoard(i=>{if(s)showTile(i);}),board=art.svg;
-  let zoom=1;
+  const board = h('div', { class: 'es-board', role: 'grid', 'aria-label': 'Game board' });
   const status = h('div', { class: 'es-status', role: 'status', 'aria-live': 'polite' }, 'Welcome to Tycoon Row.');
   const diceEl = h('div', { class: 'es-dice', 'aria-hidden': 'true' }, dieArt(5), dieArt(3));
   const feed = h('div', { class: 'es-feed', 'aria-live': 'off' });
   const meta = h('div', { class: 'es-meta' });
   const logo = h('div', { class: 'es-logo' }, h('b', null, 'TYCOON'), h('span', null, 'ROW'));
-  const center = h('aside', { class: 'es-city-console' }, logo, meta, status, diceEl, feed);
+  const center = h('div', { class: 'es-center' }, logo, meta, status, diceEl, feed);
+  board.append(center);
   const actions = h('div', { class: 'es-actions' });
   const reacts = h(
     'div',
     { class: 'es-react', role: 'group', 'aria-label': 'Quick chat' },
     [['cool', '😎'], ['oops', '😅'], ['deal', '🤝'], ['mad', '😤']].map(([k, e]) => h('button', { class: 'react-btn', type: 'button', 'aria-label': 'Say ' + e, onclick: () => sendReact(k, e) }, e)),
   );
-  const cityPicker=h('select',{'aria-label':'Inspect a city or space',onchange:e=>{if(e.target.value!=='')showTile(+e.target.value);}},h('option',{value:''},'Inspect a city or space…'),core.TILES.map(t=>h('option',{value:t.i},`${t.name}${t.price?' · '+money(t.price):''}`)));
-  const viewport=h('div',{class:'es-board-viewport',tabIndex:0,'aria-label':'Scrollable 3D city board'},board);
-  const zoomText=h('span',{class:'es-board-scale'},'100%');
-  function resizeBoard(){board.style.setProperty('width',`${zoom*100}%`);board.style.setProperty('min-width',`${zoom*100}%`);zoomText.textContent=Math.round(zoom*100)+'%';}
-  const viewControls=h('div',{class:'es-board-tools'},cityPicker,h('button',{class:'btn','aria-label':'Zoom out',onclick:()=>{zoom=Math.max(1,zoom-.3);resizeBoard();}},'−'),zoomText,h('button',{class:'btn','aria-label':'Zoom in',onclick:()=>{zoom=Math.min(2.5,zoom+.3);resizeBoard();}},'+'),h('button',{class:'btn',onclick:()=>{zoom=1;resizeBoard();viewport.scrollTo({left:0,top:0});}},'Fit board'));
-  const boardPanel=h('section',{class:'es-world-board'},h('div',{class:'es-world-heading'},h('span',{class:'eyebrow'},'THE WORLD CITY EXCHANGE'),h('span',null,'Tap a city to inspect its deed')),viewControls,viewport);
-  const consolePanel=h('div',{class:'es-console-panel'},center,actions,reacts);
-  const el=h('div',{class:'es es-world'},top,chips,h('div',{class:'es-world-layout'},boardPanel,consolePanel));root.append(el);
+  const el = h('div', { class: 'es' }, top, chips, h('div', { class: 'es-boardwrap' }, board), actions, reacts);
+  root.append(el);
 
-  const tokenEls=[];
-  function refreshTiles(){art.refresh(s);}
-  function placeToken(p,pos){tokenEls[p.id]=art.placeToken(p,pos,s.turn,s.over);}
+  // ----- board tiles -----
+  const tileEls = [];
+  const tokenEls = [];
+  for (const t of core.TILES) {
+    const [c, r] = cellOf(t.i);
+    const side = sideOf(t.i);
+    const band = t.type === 'prop' ? h('i', { class: 't-band', style: { background: core.GROUPS[t.group].color } }) : null;
+    const tokens = h('span', { class: 't-tokens' });
+    const pips = h('span', { class: 't-pips' });
+    const owner = h('span', { class: 't-owner' });
+    const emoji = t.emoji || TILE_EMOJI[t.type];
+    const tile = h(
+      'button',
+      {
+        class: 'es-tile ' + t.type + ' side-' + side,
+        type: 'button',
+        style: { 'grid-column': String(c + 1), 'grid-row': String(r + 1) },
+        'aria-label': t.name,
+        onclick: () => showTile(t.i),
+      },
+      band,
+      emoji ? h('span', { class: 't-emoji' }, emoji) : null,
+      h('span', { class: 't-name' }, t.short),
+      t.price ? h('span', { class: 't-price' }, '$' + t.price) : null,
+      pips,
+      owner,
+      tokens,
+    );
+    tile._pips = pips;
+    tile._owner = owner;
+    tile._tokens = tokens;
+    tileEls[t.i] = tile;
+    board.append(tile);
+  }
+
+  function refreshTiles() {
+    for (const t of core.TILES) {
+      const tile = tileEls[t.i];
+      const o = s.owner[t.i];
+      if (o >= 0) {
+        tile.classList.add('owned');
+        tile.style.setProperty('--own', s.players[o].color);
+        if (tile._ownedBy !== o) {
+          tile._owner.textContent = s.players[o].face;
+          tile._ownedBy = o;
+          tile.classList.remove('flash');
+          void tile.offsetWidth;
+          tile.classList.add('flash');
+        }
+      } else {
+        tile.classList.remove('owned', 'flash');
+        tile.style.removeProperty('--own');
+        tile._owner.textContent = '';
+        tile._ownedBy = -1;
+      }
+      const lv = s.level[t.i];
+      if (tile._lv !== lv) {
+        tile._lv = lv;
+        fill(tile._pips, lv >= 4 ? h('i', { class: 'hotel' }) : Array.from({ length: lv }, () => h('i', { class: 'house' })));
+      }
+    }
+  }
+  function placeToken(p, pos) {
+    let tk = tokenEls[p.id];
+    if (!tk) {
+      tk = h('span', { class: 'tok', style: { '--pc': p.color }, title: p.name }, p.face);
+      tokenEls[p.id] = tk;
+    }
+    tileEls[pos]._tokens.append(tk);
+    tk.classList.toggle('out', p.bankrupt);
+    for (const q of s.players) if (tokenEls[q.id]) tokenEls[q.id].classList.toggle('turn', q.id === s.turn && !s.over);
+  }
 
   function setPips(pi) {
     return h(
@@ -103,10 +177,8 @@ export function mount(root, ctx) {
     );
     round.set(`${Math.min(s.round, s.maxRounds)}/${s.maxRounds}`);
     worth.set(money(s.players[0].cash));
-    for (const q of s.players) if (tokenEls[q.id]) tokenEls[q.id].classList.toggle('active', q.id === s.turn && !s.over);
-    const ahead = Array.from({length:6},(_,k)=>core.TILES[(s.players[0].pos+k+2)%40]).filter(t=>s.owner[t.i]>=1);
-    meta.textContent = `Net worth ${money(core.netWorth(s,0))} · ${ahead.length} rival deeds in the next 2–7 spaces`;
-    meta.title='Potential rent risk; dice totals vary. Inspect each deed for its rent.';
+    for (const q of s.players) if (tokenEls[q.id]) tokenEls[q.id].classList.toggle('turn', q.id === s.turn && !s.over);
+    meta.textContent = `Round ${Math.min(s.round, s.maxRounds)} of ${s.maxRounds}  ·  Picnic pot ${money(s.pot)}`;
   }
 
   function showDeeds(pi) {
@@ -127,7 +199,7 @@ export function mount(root, ctx) {
     }
     const lines = core.STATION_TILES.filter((i) => s.owner[i] === pi);
     const util = core.UTILITY_TILES.filter((i) => s.owner[i] === pi);
-    if (lines.length) rows.push(h('div', { class: 'deed-row' }, h('i', { class: 'deed-dot', style: { background: '#9aa4b8' } }), h('div', null, h('b', null, `Gateways ${lines.length}/${core.STATION_TILES.length}`), h('small', null, lines.map((i) => core.TILES[i].short).join(', ')))));
+    if (lines.length) rows.push(h('div', { class: 'deed-row' }, h('i', { class: 'deed-dot', style: { background: '#9aa4b8' } }), h('div', null, h('b', null, `Lines ${lines.length}/${core.STATION_TILES.length}`), h('small', null, lines.map((i) => core.TILES[i].short).join(', ')))));
     if (util.length) rows.push(h('div', { class: 'deed-row' }, h('i', { class: 'deed-dot', style: { background: '#e8d9a0' } }), h('div', null, h('b', null, `Utilities ${util.length}/${core.UTILITY_TILES.length}`), h('small', null, util.map((i) => core.TILES[i].short).join(', ')))));
     overlay(el, {
       title: `${p.face} ${p.name}`,
@@ -343,7 +415,6 @@ export function mount(root, ctx) {
     } finally {
       driving = false;
     }
-    save();
     renderControls();
   }
 
@@ -434,7 +505,7 @@ export function mount(root, ctx) {
       lines.push(h('p', null, `${core.GROUPS[t.group].name} set · deed ${money(t.price)} · buildings ${money(core.GROUPS[t.group].house)} each`));
       lines.push(h('ul', { class: 'rent-list' }, h('li', null, `Rent ${money(t.rent[0])} (double with the full set)`), h('li', null, `1 building ${money(t.rent[1])}`), h('li', null, `2 buildings ${money(t.rent[2])}`), h('li', null, `3 buildings ${money(t.rent[3])}`), h('li', null, `Hotel ${money(t.rent[4])}`)));
     } else if (t.type === 'utility') lines.push(h('p', null, `Deed ${money(t.price)}. Rent is 4 times the dice roll, or 10 times if the owner has both utilities.`));
-    else if (t.type === 'station') lines.push(h('p', null, `Deed ${money(t.price)}. Rent $25, $50 or $100 depending on how many Gateways the owner has. All four charge $200 rent.`));
+    else if (t.type === 'station') lines.push(h('p', null, `Deed ${money(t.price)}. Rent $25, $50 or $100 depending on how many Lines the owner has.`));
     else if (t.type === 'tax') lines.push(h('p', null, `Pay ${money(t.amount)}. It goes into the Picnic pot.`));
     else if (t.type === 'park') lines.push(h('p', null, `Landing here wins the Picnic pot. It holds ${money(s.pot)} right now.`));
     else if (t.type === 'wild') lines.push(h('p', null, 'Draw a Wildcard. Could be cash, a bill, or a surprise trip.'));
@@ -447,27 +518,24 @@ export function mount(root, ctx) {
 
   // ----- start / end -----
   function setup() {
-    s = old ? old.state : core.createGame({ seed: ctx.seed ?? ((Date.now() ^ 0x85ebca6b) & 0x7fffffff), difficulty: diff, rounds });
-    diff=s.diff;rounds=s.maxRounds;
+    s = core.createGame({ seed: (Date.now() ^ 0x85ebca6b) & 0x7fffffff, difficulty: diff, rounds });
     messages.length = 0;
     paintFeed(null);
-    for (const p of s.players) placeToken(p, p.pos);
+    for (const p of s.players) placeToken(p, 0);
     refreshChips();
     refreshTiles();
-    state = 'play'; ctx.playing(true);
-    round.set(`${s.round}/${rounds}`);
-    save();
+    state = 'play';
+    round.set(`1/${rounds}`);
     say('Welcome to Tycoon Row.');
     drive();
   }
 
   async function finish() {
     if (state === 'over') return;
-    state = 'over'; ctx.playing(false);
+    state = 'over';
     actions.replaceChildren();
     await wait(900);
     if (dead) return;
-    store.clearGame('estate');
     const st = core.standings(s);
     const place = st.findIndex((x) => x.id === 0);
     const score = core.netWorth(s, 0) + [1500, 800, 300, 0][place];
@@ -477,7 +545,6 @@ export function mount(root, ctx) {
       score,
       level: diff,
       completed: true,
-      variant: `rivals${diff}_rounds${rounds}`,
       extra: [`You finished ${['1st', '2nd', '3rd', '4th'][place]} of 4`, ...st.map((x, k) => `${k + 1}. ${x.name}: ${x.bankrupt ? 'bankrupt' : money(x.worth)}`), won && diff < 3 ? 'Your rivals will play tougher next time' : `Rivals: ${['Easy', 'Normal', 'Hard'][diff - 1]}`],
     });
   }
@@ -485,20 +552,17 @@ export function mount(root, ctx) {
   function openPause() {
     if (state !== 'play' || pauseOv) return;
     paused = true;
-    state = 'paused'; ctx.playing(false);
-    save();
     pauseOv = overlay(el, {
       title: 'Paused',
       body: h('p', null, 'The game is on hold.'),
       buttons: [
-        { label: 'Save & leave', onclick: () => {save();ctx.exit();} },
+        { label: 'Quit game', kind: 'danger', onclick: () => ctx.exit() },
         {
           label: 'Resume',
           kind: 'primary',
           onclick: () => {
             pauseOv = null;
             paused = false;
-            state = 'play'; ctx.playing(true);
           },
         },
       ],
@@ -513,7 +577,7 @@ export function mount(root, ctx) {
     function paint() {
       fill(
         body,
-        h('p', null, `Travel a 3D board of world cities for ${rounds} rounds. Collect deeds across eight country sets, earn rent, develop your cities and finish richest.`),
+        h('p', null, `Race around the 40-square board for ${rounds} rounds. Buy deeds, collect rent, build on full sets, and finish richest.`),
         h('ul', null, h('li', null, 'Land on an unowned deed to buy it, or send it to auction.'), h('li', null, 'Own every deed in a color to double its rent and build on it.'), h('li', null, 'Squares glow in their owner\u2019s color. Tap any square or player to see deeds and rents.')),
         h('div', { class: 'es-roster' }, ['penny', 'rex', 'vera'].map((k) => h('div', { class: 'es-rival', style: { '--pc': PERSONAS[k].color } }, h('span', null, PERSONAS[k].face), h('div', null, h('b', null, PERSONAS[k].name), h('small', null, PERSONAS[k].bio))))),
         h('div', { class: 'theme-chips', role: 'radiogroup', 'aria-label': 'Rival skill' }, names.map((n, i) => h('button', { class: 'theme-chip' + (diff === i + 1 ? ' on' : ''), type: 'button', role: 'radio', 'aria-checked': diff === i + 1 ? 'true' : 'false', onclick: () => ((diff = i + 1), store.setPref('estate', 'diff', diff), paint()) }, h('small', null, n)))),
@@ -525,11 +589,10 @@ export function mount(root, ctx) {
     paint();
     overlay(el, { title: 'Tycoon Row', body, buttons: [{ label: 'Deal me in', kind: 'primary', onclick: setup }] });
   }
-  if(old)overlay(el,{title:'Your cities are waiting',body:h('p',null,`Continue round ${old.state.round} with your deeds and cash intact.`),buttons:[{label:'Continue game',kind:'primary',onclick:setup}]});else showReady();
+  showReady();
 
   return {
     destroy() {
-      if(s && state!=='over')save();
       dead = true;
     },
     pause: openPause,

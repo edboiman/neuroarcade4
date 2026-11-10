@@ -1,29 +1,15 @@
 // Offline cache. All files are stored at install time and served cache-first.
 // This worker never contacts any server except to download this app's own files once per update,
 // and it ignores every cross-origin request.
-const VERSION = 'c613c1073c';
-const LEGACY_PREFIX = 'neuro-arcade-';
-const PREFIX = 'neuro-arcade:' + new URL(self.registration.scope).pathname + ':';
+const VERSION = 'd9bd2102f4';
+const PREFIX = 'neuro-arcade-';
 const CACHE = PREFIX + VERSION;
 const PRECACHE = [
   /*PRECACHE_START*/
   './',
-  './assets/arcade-room.webp',
-  './assets/cinderpath-actors.webp',
-  './assets/cinderpath-expansion.webp',
-  './assets/city.webp',
-  './assets/curio-objects.webp',
-  './assets/forest.webp',
-  './assets/horde-actors.webp',
-  './assets/horde-ground.webp',
   './css/base.css',
-  './css/cinderpath.css',
-  './css/curio.css',
-  './css/estate.css',
-  './css/expansion.css',
   './css/games.css',
   './css/hub.css',
-  './css/rooms.css',
   './css/screens.css',
   './css/theme.css',
   './fonts/poppins-400.woff',
@@ -35,38 +21,23 @@ const PRECACHE = [
   './index.html',
   './js/art.js',
   './js/audio.js',
-  './js/catalog.js',
   './js/checkin.js',
-  './js/checkpoint.js',
-  './js/game-validation.js',
   './js/games/blockfit-core.js',
-  './js/games/blockfit-input.js',
   './js/games/blockfit.js',
-  './js/games/cinderpath-art.js',
-  './js/games/cinderpath-content.js',
-  './js/games/cinderpath-core.js',
-  './js/games/cinderpath-data.js',
-  './js/games/cinderpath-engine.js',
-  './js/games/cinderpath-journal.js',
-  './js/games/cinderpath-legacy.js',
-  './js/games/cinderpath.js',
+  './js/games/cafe-core.js',
+  './js/games/cafe-data.js',
+  './js/games/cafe-lesson.js',
+  './js/games/cafe.js',
   './js/games/common.js',
-  './js/games/conquest-art.js',
-  './js/games/conquest-core.js',
-  './js/games/conquest.js',
-  './js/games/curio-art.js',
-  './js/games/curio-core.js',
-  './js/games/curio.js',
-  './js/games/estate-board.js',
+  './js/games/dungeon-art.js',
+  './js/games/dungeon-core.js',
+  './js/games/dungeon.js',
   './js/games/estate-chat.js',
   './js/games/estate-core.js',
   './js/games/estate.js',
-  './js/games/marbleworks-art.js',
-  './js/games/marbleworks-core.js',
-  './js/games/marbleworks.js',
+  './js/games/lingo-art.js',
+  './js/games/lingo-scenes.js',
   './js/games/rng.js',
-  './js/games/rooms-core.js',
-  './js/games/rooms.js',
   './js/games/survivor-art.js',
   './js/games/survivor-core.js',
   './js/games/survivor-input.js',
@@ -75,70 +46,52 @@ const PRECACHE = [
   './js/hub.js',
   './js/loop.js',
   './js/main.js',
-  './js/miniatures.js',
   './js/registry.js',
-  './js/session.js',
   './js/settings.js',
   './js/stats.js',
   './js/store.js',
   './js/ui.js',
   './js/weekly.js',
-  './manifest.webmanifest',
-  './js/version.js'
+  './manifest.webmanifest'
   /*PRECACHE_END*/
 ];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil((async () => {
-    const cache = await caches.open(CACHE);
-    await cache.addAll(PRECACHE.map(u => new Request(u, { cache: 'reload' })));
-    // Switch only after every release file has installed successfully.
-    await self.skipWaiting();
-  })());
+  event.waitUntil(
+    caches.open(CACHE).then((cache) => cache.addAll(PRECACHE.map((u) => new Request(u, { cache: 'reload' })))),
+  );
 });
 
-async function belongsToThisApp(key) {
-  if (key.startsWith(PREFIX)) return true;
-  if (!key.startsWith(LEGACY_PREFIX)) return false;
-  const cache = await caches.open(key);
-  return !!(await cache.match(self.registration.scope));
-}
-
-async function refreshOldShell(client) {
-  if (!client.url.startsWith(self.registration.scope)) return;
-  // New clients acknowledge and preserve an active game. Legacy clients cannot
-  // acknowledge, so navigate them to the fully installed release once.
-  const acknowledged = await new Promise(resolve => {
-    const channel = new MessageChannel();
-    const timer = setTimeout(() => { channel.port1.close(); resolve(false); }, 700);
-    channel.port1.onmessage = () => { clearTimeout(timer); channel.port1.close(); resolve(true); };
-    try { client.postMessage({ type: 'ARCADE_ACTIVATED', version: VERSION }, [channel.port2]); }
-    catch { clearTimeout(timer); channel.port1.close(); resolve(false); }
-  });
-  if (!acknowledged) {
-    // Do not await navigation inside activate: its fetch waits for activation.
-    client.navigate(client.url).catch(() => {});
-  }
-}
-
 self.addEventListener('activate', (event) => {
-  event.waitUntil((async () => {
-    const obsolete = [];
-    for (const key of await caches.keys()) {
-      if (key !== CACHE && await belongsToThisApp(key)) obsolete.push(key);
-    }
-    await self.clients.claim();
-    if (obsolete.length) {
-      const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-      await Promise.all(windows.map(refreshOldShell));
-      for (const key of obsolete) await caches.delete(key);
-    }
-  })());
+  event.waitUntil(
+    (async () => {
+      for (const key of await caches.keys()) {
+        if (key.startsWith(PREFIX) && key !== CACHE) await caches.delete(key);
+      }
+      await self.clients.claim();
+    })(),
+  );
 });
 
 self.addEventListener('message', (event) => {
   if (event.data === 'SKIP_WAITING') self.skipWaiting();
 });
+
+// If the browser evicted our cache (Android does this to sites under storage pressure) the worker
+// would otherwise keep answering "not available" even online. On a miss we re-download the app's own
+// files (same origin only) and serve them; offline with nothing cached is the only real failure.
+let repairing = null;
+function repair() {
+  if (!repairing) {
+    repairing = caches
+      .open(CACHE)
+      .then((cache) => cache.addAll(PRECACHE.map((u) => new Request(u, { cache: 'reload' }))))
+      .finally(() => {
+        repairing = null;
+      });
+  }
+  return repairing;
+}
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
@@ -150,9 +103,17 @@ self.addEventListener('fetch', (event) => {
       const cache = await caches.open(CACHE);
       const hit = await cache.match(req, { ignoreSearch: true });
       if (hit) return hit;
-      if (req.mode === 'navigate') {
-        const shell = (await cache.match('./')) || (await cache.match('index.html'));
-        if (shell) return shell;
+      try {
+        if (req.mode === 'navigate') await repair();
+        else await cache.add(new Request(req.url, { cache: 'reload' }));
+        const fresh = await cache.match(req, { ignoreSearch: true });
+        if (fresh) return fresh;
+        if (req.mode === 'navigate') {
+          const shell = (await cache.match('./')) || (await cache.match('index.html'));
+          if (shell) return shell;
+        }
+      } catch (e) {
+        // offline and not cached: fall through
       }
       return new Response('Not available offline', { status: 404, headers: { 'Content-Type': 'text/plain' } });
     })(),

@@ -56,6 +56,63 @@ function blockfit(a, b) {
   return scene(defs, ...k);
 }
 
+// a drawn person, used by the Lingo art
+function person(x, y, sc, skin, hair, shirt) {
+  return [
+    s('path', { d: `M${x - 34 * sc} ${y + 60 * sc} Q${x - 32 * sc} ${y + 18 * sc} ${x} ${y + 16 * sc} Q${x + 32 * sc} ${y + 18 * sc} ${x + 34 * sc} ${y + 60 * sc} Z`, fill: shirt }),
+    s('rect', { x: x - 6 * sc, y: y + 4 * sc, width: 12 * sc, height: 14 * sc, rx: 4 * sc, fill: skin }),
+    s('ellipse', { cx: x, cy: y - 10 * sc, rx: 17 * sc, ry: 19 * sc, fill: skin }),
+    s('path', { d: `M${x - 18 * sc} ${y - 8 * sc} Q${x - 20 * sc} ${y - 32 * sc} ${x} ${y - 31 * sc} Q${x + 21 * sc} ${y - 32 * sc} ${x + 18 * sc} ${y - 8 * sc} Q${x + 10 * sc} ${y - 22 * sc} ${x} ${y - 21 * sc} Q${x - 10 * sc} ${y - 22 * sc} ${x - 18 * sc} ${y - 8 * sc} Z`, fill: hair }),
+    s('circle', { cx: x - 6 * sc, cy: y - 9 * sc, r: 2.2 * sc, fill: '#1c1420' }),
+    s('circle', { cx: x + 6 * sc, cy: y - 9 * sc, r: 2.2 * sc, fill: '#1c1420' }),
+    s('path', { d: `M${x - 6 * sc} ${y - 1 * sc} Q${x} ${y + 5 * sc} ${x + 6 * sc} ${y - 1 * sc}`, stroke: '#7a2e2e', 'stroke-width': 2 * sc, fill: 'none', 'stroke-linecap': 'round' }),
+    s('circle', { cx: x - 11 * sc, cy: y - 2 * sc, r: 3 * sc, fill: '#ff8a8a', opacity: 0.35 }),
+    s('circle', { cx: x + 11 * sc, cy: y - 2 * sc, r: 3 * sc, fill: '#ff8a8a', opacity: 0.35 }),
+  ];
+}
+
+function cafe(a, b) {
+  const bg = id('cfbg');
+  const wall = id('cfw');
+  const counter = id('cfc');
+  const cup = id('cfcup');
+  const lamp = id('cfl');
+  const defs = [
+    lg(bg, [[0, '#3a2350'], [1, '#1a1030']]),
+    lg(wall, [[0, '#4a2c5e'], [1, '#2b1a3c']]),
+    lg(counter, [[0, '#8a5a3a'], [1, '#5a3622']]),
+    lg(cup, [[0, '#ffffff'], [1, '#d9d2e6']]),
+    rg(lamp, [[0, '#ffd88a', 0.7], [1, '#ffd88a', 0]]),
+  ];
+  const k = [s('rect', { width: 200, height: 280, fill: url(bg) })];
+  // window with a skyline
+  k.push(s('rect', { x: 110, y: 26, width: 74, height: 86, rx: 8, fill: '#2a4a8a' }), s('rect', { x: 110, y: 26, width: 74, height: 86, rx: 8, fill: 'none', stroke: '#e8d9c8', 'stroke-width': 4 }));
+  for (const [x, h] of [[116, 30], [128, 46], [142, 24], [154, 52], [168, 36]]) k.push(s('rect', { x, y: 108 - h, width: 11, height: h, fill: '#1c2c55' }));
+  k.push(s('circle', { cx: 170, cy: 44, r: 7, fill: '#ffe9a8' }));
+  // awning
+  for (let i = 0; i < 10; i++) k.push(s('path', { d: `M${i * 20} 0 h20 v16 q-10 9 -20 0 Z`, fill: i % 2 ? '#f6efe4' : a }));
+  // hanging lamp glow
+  k.push(s('circle', { cx: 60, cy: 70, r: 60, fill: url(lamp) }), s('line', { x1: 60, y1: 16, x2: 60, y2: 50, stroke: '#2a1d2a', 'stroke-width': 2 }), s('path', { d: 'M46 62 Q60 42 74 62 Z', fill: '#ffcf6b' }));
+  // the customer and a speech bubble
+  k.push(...person(64, 150, 1.25, '#f2c7a5', '#3b2416', b));
+  k.push(s('path', { d: 'M96 96 h88 a12 12 0 0 1 12 12 v34 a12 12 0 0 1 -12 12 h-62 l-14 14 l2 -14 h-14 a12 12 0 0 1 -12 -12 v-34 a12 12 0 0 1 12 -12 Z', fill: '#fff' }));
+  k.push(s('text', { x: 140, y: 120, 'text-anchor': 'middle', 'font-size': 13, 'font-weight': 800, fill: '#2a1d44', 'font-family': 'Poppins, sans-serif', text: '¡Un café,' }));
+  k.push(s('text', { x: 140, y: 138, 'text-anchor': 'middle', 'font-size': 13, 'font-weight': 800, fill: '#2a1d44', 'font-family': 'Poppins, sans-serif', text: 'por favor!' }));
+  // counter with a cup and a croissant
+  k.push(s('rect', { x: -10, y: 214, width: 220, height: 80, fill: url(counter) }), s('rect', { x: -10, y: 210, width: 220, height: 8, fill: '#c48a5a' }));
+  k.push(s('ellipse', { cx: 132, cy: 214, rx: 26, ry: 6, fill: '#e8e2f2' }));
+  k.push(s('path', { d: 'M114 186 h36 l-4 26 q-14 6 -28 0 Z', fill: url(cup) }), s('path', { d: 'M150 192 q12 2 8 12 q-3 6 -10 4', fill: 'none', stroke: '#d9d2e6', 'stroke-width': 4 }));
+  k.push(s('ellipse', { cx: 132, cy: 187, rx: 18, ry: 4, fill: '#6b3f22' }));
+  for (const dx of [-6, 4]) k.push(s('path', { d: `M${132 + dx} 180 q-6 -8 0 -16 q6 -8 0 -14`, stroke: '#fff', 'stroke-width': 2.5, fill: 'none', opacity: 0.5, 'stroke-linecap': 'round' }));
+  k.push(s('path', { d: 'M168 210 q-6 -16 12 -20 q18 4 12 20 q-12 4 -24 0 Z', fill: '#f0a845' }), s('path', { d: 'M174 206 l4 -14 M182 206 l0 -15 M188 206 l-3 -13', stroke: '#c4782a', 'stroke-width': 2 }));
+  // flag badges
+  [['#c60b1e', '#ffc400'], ['#0055a4', '#ef4135'], ['#000000', '#dd0000']].forEach(([c1, c2], i) => {
+    const x = 22 + i * 26;
+    k.push(s('circle', { cx: x, cy: 240, r: 10, fill: c1 }), s('rect', { x: x - 10, y: 238, width: 20, height: 6, fill: c2 }), s('circle', { cx: x, cy: 240, r: 10, fill: 'none', stroke: '#fff', 'stroke-width': 2 }));
+  });
+  return scene(defs, ...k);
+}
+
 function survivor(a, b) {
   const bg = id('svbg');
   const halo = id('svh');
@@ -152,5 +209,36 @@ function estate(a, b) {
   return scene(defs, ...k);
 }
 
-const MAKERS = { blockfit, survivor, estate };
+function dungeon(a, b) {
+  const bg = id('ddbg');
+  const torch = id('ddt');
+  const stone = id('dds');
+  const hole = id('ddh');
+  const gem = id('ddg');
+  const defs = [
+    lg(bg, [[0, '#122542'], [1, '#050a14']]),
+    rg(torch, [[0, '#ffc66b', 0.65], [1, '#ff9a2e', 0]]),
+    lg(stone, [[0, '#3c4b6b'], [1, '#232c42']]),
+    rg(hole, [[0, '#000'], [0.7, '#05070d'], [1, '#141c30']], 0.5, 0.35, 0.65),
+    lg(gem, [[0, '#8fe3ff'], [1, '#2a7dff']]),
+  ];
+  const k = [s('rect', { width: 200, height: 280, fill: url(bg) })];
+  // brick wall
+  for (let r = 0; r < 12; r++) for (let c = -1; c < 7; c++) k.push(s('rect', { x: c * 32 + (r % 2 ? 16 : 0) + 1, y: r * 18 + 1, width: 30, height: 16, rx: 2, fill: url(stone), opacity: 0.55 + ((r * 7 + c * 3) % 5) * 0.06 }));
+  // arch doorway with stairs into darkness
+  k.push(s('path', { d: 'M52 236 V120 a48 48 0 0 1 96 0 V236 Z', fill: '#1a2236' }), s('path', { d: 'M60 236 V122 a40 40 0 0 1 80 0 V236 Z', fill: url(hole) }));
+  for (let i = 0; i < 5; i++) k.push(s('rect', { x: 64 + i * 4, y: 228 - i * 14, width: 72 - i * 8, height: 7, fill: '#3a4766', opacity: 1 - i * 0.18 }));
+  // torches
+  for (const x of [32, 168]) k.push(s('circle', { cx: x, cy: 110, r: 46, fill: url(torch) }), s('rect', { x: x - 3, y: 110, width: 6, height: 20, fill: '#5a3a1e' }), s('path', { d: `M${x} 92 q8 10 0 20 q-8 -10 0 -20 Z`, fill: '#ffcf5c' }), s('path', { d: `M${x} 99 q4 6 0 12 q-4 -6 0 -12 Z`, fill: '#fff4c2' }));
+  // the explorer with a lantern
+  k.push(s('ellipse', { cx: 100, cy: 262, rx: 26, ry: 6, fill: '#000', opacity: 0.5 }));
+  k.push(s('path', { d: 'M100 204 Q124 220 120 260 H80 Q76 220 100 204 Z', fill: '#2f9b6e' }), s('circle', { cx: 100, cy: 218, r: 12, fill: '#226b4e' }), s('ellipse', { cx: 100, cy: 221, rx: 8, ry: 7, fill: '#f2d0b2' }));
+  k.push(s('circle', { cx: 128, cy: 236, r: 22, fill: url(torch) }), s('rect', { x: 124, y: 230, width: 8, height: 11, rx: 2, fill: '#ffe9a0' }));
+  // crystal and spikes
+  k.push(s('path', { d: 'M160 236 l10 -14 l10 14 l-10 22 Z', fill: url(gem) }), s('path', { d: 'M160 236 l10 -14 l0 36 Z', fill: '#fff', opacity: 0.25 }));
+  for (let i = 0; i < 4; i++) k.push(s('path', { d: `M${18 + i * 8} 258 l4 -14 l4 14 Z`, fill: '#c9d1de' }));
+  return scene(defs, ...k);
+}
+
+const MAKERS = { blockfit, cafe, survivor, estate, dungeon };
 export const gameArt = (g) => MAKERS[g.id](g.accent, g.accent2);

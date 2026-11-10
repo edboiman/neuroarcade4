@@ -1,7 +1,6 @@
 // Local-only storage. Everything lives in this browser's localStorage; nothing is ever sent anywhere.
 // All data read back (including imported files) is validated and clamped before use.
-import { GAME_IDS, STORED_GAME_IDS } from './catalog.js';
-import {emptyJournal,cleanJournal,recordJournal} from './games/cinderpath-journal.js';
+import { GAME_IDS } from './weekly.js';
 
 const KEY = 'neuroarcade.v1';
 const SAVE_PREFIX = 'neuroarcade.v1.save.';
@@ -22,14 +21,13 @@ export function defaults() {
   return {
     v: 1,
     created: Date.now(),
-    settings: { saver: true, sound: true, haptics: true, reduce: false, largeText: false, reminders: false },
+    settings: { saver: true, sound: true, haptics: true, reduce: false },
     sessions: [],
     checkins: [],
     skills: {},
     prefs: {},
     seenWeek: 0,
     onboarded: false,
-    cinderpath: emptyJournal(),
   };
 }
 
@@ -39,19 +37,16 @@ export function sanitize(raw) {
   d.created = num(raw.created, 0, 4e12, d.created);
   d.seenWeek = num(raw.seenWeek, 0, 4e12, 0);
   d.onboarded = bool(raw.onboarded, false);
-  d.cinderpath = cleanJournal(raw.cinderpath);
   const st = raw.settings && typeof raw.settings === 'object' ? raw.settings : {};
   d.settings = {
     saver: bool(st.saver, true),
     sound: bool(st.sound, true),
     haptics: bool(st.haptics, true),
     reduce: bool(st.reduce, false),
-    largeText: bool(st.largeText, false),
-    reminders: bool(st.reminders, false),
   };
   if (Array.isArray(raw.sessions)) {
     for (const s of raw.sessions.slice(-MAX_SESSIONS * 2)) {
-      if (!s || typeof s !== 'object' || !STORED_GAME_IDS.includes(s.g)) continue;
+      if (!s || typeof s !== 'object' || !GAME_IDS.includes(s.g)) continue;
       d.sessions.push({
         g: s.g,
         t: num(s.t, 0, 4e12, 0),
@@ -60,7 +55,6 @@ export function sanitize(raw) {
         l: num(s.l, 0, 999, 0),
         a: s.a == null ? null : num(s.a, 0, 1, 0),
         c: bool(s.c, false),
-        mode: typeof s.mode === 'string' && /^[a-z0-9_-]{1,64}$/.test(s.mode) ? s.mode : 'standard',
       });
     }
     d.sessions.sort((a, b) => a.t - b.t);
@@ -87,11 +81,7 @@ export function sanitize(raw) {
           if (safeKey(k)) box[k] = Math.round(num(v, 0, 4, 0));
         }
       }
-      const reviews = {};
-      if (sk.reviews && typeof sk.reviews === 'object') for (const [k, v] of Object.entries(sk.reviews).slice(0, 600)) {
-        if (safeKey(k) && v && typeof v === 'object') reviews[k] = { due: num(v.due, 0, 4e12, 0), interval: num(v.interval, 0, 365, 0), last: num(v.last, 0, 4e12, 0) };
-      }
-      d.skills[id] = { rung: Math.round(num(sk.rung, 1, 20, 1)), box, reviews };
+      d.skills[id] = { rung: Math.round(num(sk.rung, 1, 20, 1)), box };
     }
   }
   if (raw.prefs && typeof raw.prefs === 'object') {
@@ -118,8 +108,6 @@ function read(key) {
 
 let mem = sanitize(read(KEY));
 let persistFailed = false;
-const volatileSaves = new Map();
-const failedSaves = new Set();
 const listeners = new Set();
 
 function write() {
@@ -137,7 +125,7 @@ export const store = {
     return mem;
   },
   get persistFailed() {
-    return persistFailed || failedSaves.size > 0;
+    return persistFailed;
   },
   onChange(fn) {
     listeners.add(fn);
@@ -165,7 +153,6 @@ export const store = {
       l: Math.round(num(s.l, 0, 999, 0)),
       a: s.a == null ? null : num(s.a, 0, 1, 0),
       c: !!s.c,
-      mode: typeof s.mode === 'string' && /^[a-z0-9_-]{1,64}$/.test(s.mode) ? s.mode : 'standard',
     });
     if (mem.sessions.length > MAX_SESSIONS) mem.sessions.splice(0, mem.sessions.length - MAX_SESSIONS);
     write();
@@ -184,7 +171,7 @@ export const store = {
   },
   skill(id) {
     if (!safeKey(id)) return { rung: 1, box: {} };
-    if (!mem.skills[id]) mem.skills[id] = { rung: 1, box: {}, reviews: {} };
+    if (!mem.skills[id]) mem.skills[id] = { rung: 1, box: {} };
     return mem.skills[id];
   },
   saveSkills() {
@@ -205,36 +192,20 @@ export const store = {
     mem.onboarded = true;
     write();
   },
-  cinderJournal() { return cleanJournal(mem.cinderpath); },
-  recordCinderpath(run) { mem.cinderpath = recordJournal(mem.cinderpath,run); write(); },
   // Resumable game saves are kept apart from the main record.
   saveGame(id, obj) {
-    if (!safeKey(id)) return false;
-    const wasFailed = failedSaves.has(id);
+    if (!safeKey(id)) return;
     try {
       const txt = JSON.stringify(obj);
-      if (txt.length > MAX_SAVE_BYTES) return false;
-      // Keep a bounded in-memory copy if device storage rejects this write.
-      volatileSaves.set(id, JSON.parse(txt));
-      localStorage.setItem(SAVE_PREFIX + id, txt);
-      volatileSaves.delete(id);
-      failedSaves.delete(id);
-      if (wasFailed) for (const fn of listeners) fn();
-      return true;
+      if (txt.length <= MAX_SAVE_BYTES) localStorage.setItem(SAVE_PREFIX + id, txt);
     } catch {
-      failedSaves.add(id);
-      if (!wasFailed) for (const fn of listeners) fn();
-      return false;
+      /* ignore */
     }
   },
   loadGame(id) {
-    if (!STORED_GAME_IDS.includes(id)) return null;
-    const raw = volatileSaves.has(id) ? volatileSaves.get(id) : read(SAVE_PREFIX + id);
-    try { return JSON.stringify(raw).length <= MAX_SAVE_BYTES ? raw : null; } catch { return null; }
+    return safeKey(id) ? read(SAVE_PREFIX + id) : null;
   },
   clearGame(id) {
-    volatileSaves.delete(id);
-    failedSaves.delete(id);
     try {
       localStorage.removeItem(SAVE_PREFIX + id);
     } catch {
@@ -242,9 +213,7 @@ export const store = {
     }
   },
   exportText() {
-    const saves = {};
-    for (const id of STORED_GAME_IDS) { const run = this.loadGame(id); if (run) saves[id] = run; }
-    return JSON.stringify({ app: 'neuro-arcade', format: 2, exported: new Date().toISOString(), data: mem, saves }, null, 1);
+    return JSON.stringify({ app: 'neuro-arcade', format: 1, exported: new Date().toISOString(), data: mem }, null, 1);
   },
   importText(text) {
     if (typeof text !== 'string' || text.length > MAX_IMPORT_BYTES) return { ok: false, error: 'That file is too large to be a Neuro Arcade backup.' };
@@ -256,18 +225,14 @@ export const store = {
     }
     if (!parsed || parsed.app !== 'neuro-arcade' || !parsed.data) return { ok: false, error: 'That file is not a Neuro Arcade backup.' };
     mem = sanitize(parsed.data);
-    for (const id of STORED_GAME_IDS) { this.clearGame(id); if (parsed.saves && Object.hasOwn(parsed.saves, id)) this.saveGame(id, parsed.saves[id]); }
     write();
     return { ok: true, sessions: mem.sessions.length };
   },
   reset() {
     mem = defaults();
-    volatileSaves.clear();
-    failedSaves.clear();
-    persistFailed = false;
     try {
       localStorage.removeItem(KEY);
-      for (const g of STORED_GAME_IDS) localStorage.removeItem(SAVE_PREFIX + g);
+      for (const g of GAME_IDS) localStorage.removeItem(SAVE_PREFIX + g);
     } catch {
       /* ignore */
     }

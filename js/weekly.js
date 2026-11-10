@@ -1,6 +1,5 @@
 // Weekly rotation rules and week-over-week statistics. Pure functions, no DOM.
-import { GAME_IDS } from './catalog.js';
-export { GAME_IDS };
+export const GAME_IDS = ['blockfit', 'cafe', 'survivor', 'estate', 'dungeon'];
 // A game counts as overdue (and gets a gentle warning) after this many days without a counted session.
 export const OVERDUE_DAYS = 7;
 // A session counts toward the week if it was completed, or lasted at least this long.

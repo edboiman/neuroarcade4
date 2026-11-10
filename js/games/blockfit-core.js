@@ -1,5 +1,4 @@
-// Block Fit rules engine. One game mode, with the original in-run rule changes.
-import { mulberry32 as seeded } from './rng.js';
+// Block Fit rules engine (pure logic, no DOM). Stack falling shapes, clear rows, adapt to twists.
 export const COLS = 10;
 export const ROWS = 20;
 export const TIME_LIMIT_MS = 180000;
@@ -25,7 +24,15 @@ export const TWIST_TEXT = {
   ccw: 'Reverse spin: rotation direction is flipped',
 };
 
-export const mulberry32 = seeded;
+export function mulberry32(a) {
+  return function () {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
 
 const rotCells = (cells, size, dir) => cells.map(([x, y]) => (dir > 0 ? [size - 1 - y, x] : [y, size - 1 - x]));
 
@@ -125,7 +132,7 @@ function touch(g) {
   }
 }
 
-export function tick(g, dtMs, {suspendFall=false} = {}) {
+export function tick(g, dtMs) {
   if (g.over) return;
   g.elapsed += dtMs;
   if (g.elapsed >= TIME_LIMIT_MS) {
@@ -134,7 +141,6 @@ export function tick(g, dtMs, {suspendFall=false} = {}) {
     g.reason = 'time';
     return;
   }
-  if(suspendFall)return; // A direct grab holds the piece; the session clock keeps running.
   if (grounded(g)) {
     g.lockMs += dtMs;
     if (g.lockMs >= LOCK_DELAY_MS) lock(g);
@@ -179,16 +185,6 @@ export function rotate(g, dir = 1) {
     }
   }
   return false;
-}
-
-export function dragDown(g, rows) {
-  if(g.over||!Number.isFinite(rows))return 0;
-  let moved=0;
-  for(let i=0;i<Math.min(ROWS,Math.floor(rows));i++){
-    if(!fits(g.board,g.cur.cells,g.cur.x,g.cur.y+1))break;
-    g.cur.y++;g.score++;moved++;
-  }
-  return moved;
 }
 
 export function setSoft(g, on) {

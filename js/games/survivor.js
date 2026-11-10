@@ -1,7 +1,5 @@
 // Holiday Horde: canvas UI for the engine in survivor-core.js.
 import * as core from './survivor-core.js';
-import { restore, saveRun } from '../checkpoint.js';
-import { validHorde } from '../game-validation.js';
 import { THEMES, themeForDate } from './survivor-themes.js';
 import { h, haptic, fill } from '../ui.js';
 import { createLoop } from '../loop.js';
@@ -17,17 +15,8 @@ export function mount(root, ctx) {
   })();
   const activeTheme = () => (themeIdx >= 0 ? THEMES[themeIdx] : themeForDate(new Date()));
   let theme = activeTheme();
-  let manual = false; // Firing always runs independently from touch movement.
-  let moveStyle=store.pref('survivor','moveStyle',0)===1?1:0;
-  const old=ctx.resume?restore(store.loadGame('survivor'),validHorde):null;
-  let run = old ? old.state : core.createRun(ctx.seed ?? ((Date.now() ^ 0x5bd1e995) & 0x7fffffff),{duration:600,modern:true});
-  core.migrateRun(run);
-  run.manual=false; // Old dual-stick checkpoints migrate to auto-fire as well.
-  let classIdx=old?.meta?.heroClass??Math.max(0,Math.min(2,Math.round(store.pref('survivor','heroClass',0))));
-  if(![0,1,2].includes(classIdx))classIdx=0;
-  if(old && Number.isInteger(old.meta.theme) && old.meta.theme>=-1 && old.meta.theme<THEMES.length){themeIdx=old.meta.theme;theme=activeTheme();}
-  const save=()=>saveRun(store,'survivor',run,{heroClass:classIdx,theme:themeIdx,mode:ctx.mode});
-  let savedAt=0;
+  let manual = store.pref('survivor', 'aim', 0) === 1;
+  let run = core.createRun((Date.now() ^ 0x5bd1e995) & 0x7fffffff);
   let state = 'ready'; // ready | play | choose | paused | over
   let pauseOv = null;
   let cssW = 360;
@@ -41,33 +30,24 @@ export function mount(root, ctx) {
   let vignette = null;
   let walkT = 0;
 
-  const time = hud('Time', mmss(run.duration * 1000));
+  const time = hud('Time', mmss(core.RUN_SECONDS * 1000));
   const level = hud('Level', '1');
   const kills = hud('Defeated', '0');
   const top = gameTop({ title: 'Holiday Horde', onMenu: () => openPause(), right: h('div', { class: 'hud-row' }, time.el, level.el, kills.el) });
   const hpFill = h('i', { class: 'sv-fill hp' });
   const xpFill = h('i', { class: 'sv-fill xp' });
   const bars = h('div', { class: 'sv-bars' }, h('div', { class: 'sv-bar', role: 'img', 'aria-label': 'Health' }, hpFill), h('div', { class: 'sv-bar thin', role: 'img', 'aria-label': 'Experience' }, xpFill));
-  const canvas = h('canvas', { class: 'sv-canvas', 'aria-label': 'Arena. Tap a destination to move. Weapons fire automatically.' });
+  const canvas = h('canvas', { class: 'sv-canvas', 'aria-label': 'Arena' });
   const c2 = canvas.getContext('2d');
   const banner = h('div', { class: 'sv-banner', role: 'status', 'aria-live': 'polite' });
-  const buildHud=h('div',{class:'sv-build','aria-label':'Your weapons'});
-  const stopButton=h('button',{class:'sv-stop',type:'button','aria-label':'Stop moving',onclick:()=>{release();draw();}},'Stop');
-  const wrap = h('div', { class: 'sv-wrap' }, canvas, banner,buildHud,stopButton);
+  const wrap = h('div', { class: 'sv-wrap' }, canvas, banner);
   const el = h('div', { class: 'sv' }, top, bars, wrap);
   root.append(el);
 
   // ----- sprites: drawn with canvas paths once per size and theme (survivor-art.js), then copied each frame -----
-  const atlas=new Image();atlas.src='assets/horde-actors.webp';atlas.onload=()=>draw();
-  const floor=new Image();floor.src='assets/horde-ground.webp';floor.onload=()=>draw();
   const art = createArt();
   const sprites = { clear: () => art.clear() };
   function paint(kind, size, x, y, flip = false, alpha = 1, variant = 0) {
-    const row={hero:0,grunt:1,swift:2,swarm:2,tank:3,boss:3}[kind];
-    if(atlas.complete&&atlas.naturalWidth&&row!==undefined){
-      const frame=ctx.settings.reduce?0:Math.floor(run.t*(kind==='swift'||kind==='swarm'?10:7)+variant)%4;
-      c2.save();c2.globalAlpha=alpha;c2.translate(x,y);if(flip)c2.scale(-1,1);c2.drawImage(atlas,frame*192,row*192,192,192,-size*.6,-size*.75,size*1.2,size*1.2);c2.restore();return;
-    }
     const sp = art.get(kind, theme.id, size * scale * dpr, variant);
     const w = size;
     c2.globalAlpha = alpha;
@@ -168,16 +148,10 @@ export function mount(root, ctx) {
     bg.addColorStop(1, theme.bg[1]);
     c2.fillStyle = bg;
     c2.fillRect(0, 0, cssW, cssH);
-    if(floor.complete&&floor.naturalWidth){
-      const tile=384*scale,xx=((-hero.x*scale+cssW/2+sx)%tile+tile)%tile-tile,yy=((-hero.y*scale+cssH/2+sy)%tile+tile)%tile-tile;
-      c2.globalAlpha=.8;for(let x=xx;x<cssW;x+=tile)for(let y=yy;y<cssH;y+=tile)c2.drawImage(floor,x,y,tile+1,tile+1);c2.globalAlpha=1;c2.fillStyle='#06121a33';c2.fillRect(0,0,cssW,cssH);
-    }else groundTexture(sx, sy);
+    groundTexture(sx, sy);
     const ox = cssW / 2 - hero.x * scale + sx;
     const oy = cssH / 2 - hero.y * scale + sy;
     c2.setTransform(dpr * scale, 0, 0, dpr * scale, dpr * ox, dpr * oy);
-    if(navigation.target&&state==='play'){
-      const p=navigation.target;c2.strokeStyle='#b6e5d6';c2.lineWidth=1;c2.globalAlpha=.5;c2.setLineDash([4,6]);c2.beginPath();c2.moveTo(hero.x,hero.y);c2.lineTo(p.x,p.y);c2.stroke();c2.setLineDash([]);c2.globalAlpha=.9;c2.beginPath();c2.ellipse(p.x,p.y,9,5,0,0,7);c2.stroke();c2.fillStyle='#d0eee1';c2.beginPath();c2.arc(p.x,p.y,2,0,7);c2.fill();c2.globalAlpha=1;
-    }
     // scenery
     const cell = 110;
     const x0 = Math.floor((hero.x - run.view.hw - 30) / cell);
@@ -187,21 +161,12 @@ export function mount(root, ctx) {
     for (let gx = x0; gx <= x1; gx++) {
       for (let gy = y0; gy <= y1; gy++) {
         const v = hash(gx, gy);
-        if(v%100<20){const x=gx*cell+((v>>>12)%cell),y=gy*cell+((v>>>20)%cell);c2.fillStyle='#0004';shadow(x,y+9,13);c2.fillStyle='#35433c';c2.fillRect(x-8,y-13,16,22);c2.beginPath();c2.arc(x,y-13,8,Math.PI,Math.PI*2);c2.fill();c2.strokeStyle='#7c8b7055';c2.lineWidth=2;c2.beginPath();c2.moveTo(x,y-15);c2.lineTo(x,y);c2.moveTo(x-4,y-10);c2.lineTo(x+4,y-10);c2.stroke();}
+        if (v % 100 < 55) paint('prop', 14 + ((v >>> 4) % 12), gx * cell + ((v >>> 12) % cell), gy * cell + ((v >>> 20) % cell), false, 0.55, (v >>> 8) % 3);
       }
     }
-    const now = ctx.settings.reduce ? 0 : performance.now() / 1000;
-    for(const z of run.hazards||[]){
-      const active=z.t>=z.windup;
-      c2.beginPath();c2.arc(z.x,z.y,z.r,0,Math.PI*2);
-      c2.fillStyle=active?'rgba(238,157,103,.35)':'rgba(238,184,116,.09)';c2.fill();
-      c2.strokeStyle=active?'#ffe2ac':'#dfbb86';c2.lineWidth=active?3:1.5;c2.setLineDash(active?[]:[6,5]);c2.stroke();c2.setLineDash([]);
-      c2.beginPath();c2.arc(z.x,z.y,z.r*Math.min(1,z.t/z.windup),0,Math.PI*2);c2.strokeStyle='#dfbb8670';c2.stroke();
-    }
-    for(const p of run.pools){const gr=c2.createRadialGradient(p.x,p.y,2,p.x,p.y,p.r);gr.addColorStop(0,'#ffd57555');gr.addColorStop(.6,'#f8743844');gr.addColorStop(1,'#ec4d1900');c2.fillStyle=gr;c2.beginPath();c2.arc(p.x,p.y,p.r,0,7);c2.fill();c2.strokeStyle='#ffba6f77';c2.lineWidth=2;c2.beginPath();c2.arc(p.x,p.y,p.r*.7,0,7);c2.stroke();for(let i=0;i<7;i++){const a=i*2.4+run.t;c2.fillStyle='#ffd99c';c2.fillRect(p.x+Math.sin(a)*p.r*.6,p.y+Math.cos(a)*p.r*.6,2,3);}}
-    for(const p of run.chests){c2.save();c2.shadowColor='#ffe59b';c2.shadowBlur=18;c2.fillStyle='#b48744';c2.fillRect(p.x-10,p.y-9,20,17);c2.shadowBlur=0;c2.strokeStyle='#f0d397';c2.strokeRect(p.x-10,p.y-9,20,17);c2.fillStyle='#f9d78a';c2.fillRect(p.x-2,p.y-4,4,6);c2.restore();}
+    const now = performance.now() / 1000;
     // gems: a slow bob so they read as pickups
-    for(const gem of run.gems){const y=gem.y+Math.sin(now*5+gem.x)*1.5;c2.beginPath();c2.moveTo(gem.x,y-6);c2.lineTo(gem.x+4,y);c2.lineTo(gem.x,y+6);c2.lineTo(gem.x-4,y);c2.closePath();c2.fillStyle=gem.v>3?'#d4a9ff':'#6ad9df';c2.fill();c2.strokeStyle='#d5ffff';c2.lineWidth=.7;c2.stroke();}
+    for (const g of run.gems) paint('gem', g.v > 3 ? 20 : 14, g.x, g.y + Math.sin(now * 5 + g.x) * 1.5);
     // guardians
     const orbs = core.orbCount(run);
     for (let i = 0; i < orbs; i++) {
@@ -214,7 +179,9 @@ export function mount(root, ctx) {
       c2.arc(gx, gy, 13, 0, 7);
       c2.fill();
       c2.globalAlpha = 1;
-      c2.save();c2.translate(gx,gy);c2.rotate(a+run.t*6);c2.fillStyle=run.evolutions.includes('orbit')?'#ffe69b':'#d2e7df';c2.beginPath();c2.moveTo(-3,-14);c2.lineTo(5,-4);c2.lineTo(2,13);c2.lineTo(-5,4);c2.closePath();c2.fill();c2.restore();
+      c2.beginPath();
+      c2.arc(gx, gy, 7, 0, 7);
+      c2.fill();
     }
     // enemy shadows in one pass
     c2.fillStyle = 'rgba(0,0,0,.32)';
@@ -234,10 +201,10 @@ export function mount(root, ctx) {
         c2.stroke();
         c2.globalAlpha = 1;
       }
-      paint(e.kind, size, e.x, e.y + bob, hero.x > e.x,1,e.id);
+      paint(e.kind, size, e.x, e.y + bob, hero.x > e.x);
       if (e.hit > 0) {
         c2.globalCompositeOperation = 'lighter';
-        paint(e.kind, size, e.x, e.y + bob, hero.x > e.x, 0.55,e.id);
+        paint(e.kind, size, e.x, e.y + bob, hero.x > e.x, 0.55);
         c2.globalCompositeOperation = 'source-over';
       }
       if (e.kind === 'boss' || e.elite) {
@@ -252,7 +219,6 @@ export function mount(root, ctx) {
     c2.globalCompositeOperation = 'lighter';
     const pal = paletteFor(theme.id);
     for (const sh of run.shots) {
-      if(sh.axe){c2.save();c2.translate(sh.x,sh.y);c2.rotate(run.t*15);c2.strokeStyle='#c8e4da';c2.lineWidth=3;c2.beginPath();c2.moveTo(-12,0);c2.lineTo(12,0);c2.stroke();c2.fillStyle=run.evolutions.includes('axes')?'#ffe6a4':'#9bcbc7';c2.beginPath();c2.arc(0,0,12,-1.5,1.5);c2.lineTo(3,0);c2.closePath();c2.fill();c2.restore();continue;}
       const sp = Math.hypot(sh.vx, sh.vy) || 1;
       c2.strokeStyle = sh.pet ? 'rgba(120,220,255,.55)' : pal.shot;
       c2.globalAlpha = 0.45;
@@ -262,7 +228,7 @@ export function mount(root, ctx) {
       c2.lineTo(sh.x - (sh.vx / sp) * 16, sh.y - (sh.vy / sp) * 16);
       c2.stroke();
       c2.globalAlpha = 1;
-      c2.save();c2.translate(sh.x,sh.y);c2.rotate(Math.atan2(sh.vy,sh.vx));c2.strokeStyle=sh.pet?'#b4ebff':'#ffe6a5';c2.lineWidth=2;c2.beginPath();c2.moveTo(-10,0);c2.lineTo(7,0);c2.moveTo(3,-3);c2.lineTo(8,0);c2.lineTo(3,3);c2.stroke();c2.restore();
+      paint('shot', sh.pet ? 15 : 18, sh.x, sh.y, false, 1, sh.pet ? 1 : 0);
     }
     c2.globalCompositeOperation = 'source-over';
     // companion
@@ -302,8 +268,8 @@ export function mount(root, ctx) {
     // walk cycle: a little bounce and a lean into the direction of travel
     const mv = inputVec();
     const moving = Math.hypot(mv.x, mv.y) > 0.1 && state === 'play';
-    walkT = run.t;
-    const bounce = ctx.settings.reduce ? 0 : moving ? Math.abs(Math.sin(walkT * 11)) * 3 : Math.sin(now * 2) * 0.8;
+    walkT += moving ? 1 / 30 : 0;
+    const bounce = moving ? Math.abs(Math.sin(walkT * 11)) * 3 : Math.sin(now * 2) * 0.8;
     c2.save();
     c2.translate(hero.x, hero.y - 3 - bounce);
     c2.rotate(moving ? Math.max(-0.12, Math.min(0.12, mv.x * 0.12)) : 0);
@@ -312,8 +278,6 @@ export function mount(root, ctx) {
     // effects
     for (const f of fx) {
       const p = f.t / f.life;
-      if(f.damage){c2.globalAlpha=1-p;c2.fillStyle='#fff0be';c2.font='bold 12px system-ui';c2.textAlign='center';c2.fillText(f.damage,f.x,f.y-15-p*22);c2.globalAlpha=1;continue;}
-      if(f.lightning){c2.globalAlpha=1-p;c2.strokeStyle='#d3ecff';c2.lineWidth=3;c2.beginPath();c2.moveTo(f.x-8,f.y-170);c2.lineTo(f.x+7,f.y-85);c2.lineTo(f.x-5,f.y-60);c2.lineTo(f.x,f.y);c2.stroke();c2.fillStyle='#a4cfff88';c2.beginPath();c2.ellipse(f.x,f.y,20,7,0,0,7);c2.fill();c2.globalAlpha=1;continue;}
       if (f.burst) {
         c2.globalAlpha = 1 - p;
         for (const q of f.burst) {
@@ -427,11 +391,6 @@ export function mount(root, ctx) {
   // ----- events from the engine -----
   function handleEvents(now) {
     for (const e of run.events) {
-      if(e.type==='damage'&&fx.length<90)fx.push({damage:e.value,x:e.x,y:e.y,t:0,life:.55});
-      if(e.type==='lightning'&&fx.length<100)fx.push({lightning:true,x:e.x,y:e.y,t:0,life:.3});
-      if(e.type==='evolution'){say(`EVOLUTION · ${e.name}`,4000);ctx.audio.good();}
-      if(e.type==='treasure'){say(`CHEST · ${e.name} upgraded + 30 health`,2500);ctx.audio.good();}
-      if(e.type==='hazard')say(`${e.name}: leave the marked circle`,2400);
       if (e.type === 'kill') {
         if (fx.length < 50) {
           const n = e.kind === 'boss' ? 16 : e.elite ? 10 : 6;
@@ -488,31 +447,34 @@ export function mount(root, ctx) {
   // ----- game loop -----
   const keys = new Set();
   const sticks = input.createInput();
-  const navigation=input.createNavigation();
   const camView = () => ({ w: cssW, h: cssH, scale, heroX: run.hero.x, heroY: run.hero.y });
   function release() {
     input.releaseAll(sticks);
-    input.stopNavigation(navigation);
     keys.clear();
   }
-  function inputVec(dt=1/60) {
-    let x=(keys.has('ArrowRight')||keys.has('d')?1:0)-(keys.has('ArrowLeft')||keys.has('a')?1:0);
-    let y=(keys.has('ArrowDown')||keys.has('s')?1:0)-(keys.has('ArrowUp')||keys.has('w')?1:0);
-    if(x||y){input.stopNavigation(navigation);input.releaseAll(sticks);return{x,y};}
-    if(moveStyle===0)return input.navigationVector(navigation,run.hero,core.heroSpeed(run),dt)||{x:0,y:0};
-    return input.moveVector(sticks)||{x:0,y:0};
+  function inputVec() {
+    const mv = input.moveVector(sticks);
+    if (mv) return mv;
+    let x = 0;
+    let y = 0;
+    if (keys.has('ArrowLeft') || keys.has('a')) x -= 1;
+    if (keys.has('ArrowRight') || keys.has('d')) x += 1;
+    if (keys.has('ArrowUp') || keys.has('w')) y -= 1;
+    if (keys.has('ArrowDown') || keys.has('s')) y += 1;
+    return { x, y };
   }
-  function movementPicker(){
-    const group=h('div',{class:'theme-chips two',role:'group','aria-label':'Movement controls'});
-    fill(group,['Tap destination','Drag stick'].map((name,i)=>h('button',{class:'theme-chip'+(moveStyle===i?' on':''),type:'button','aria-pressed':String(moveStyle===i),onclick:e=>{release();moveStyle=i;store.setPref('survivor','moveStyle',i);for(const b of group.children){b.classList.toggle('on',b===e.currentTarget);b.setAttribute('aria-pressed',String(b===e.currentTarget));}}},h('strong',null,name),h('small',null,i===0?'Tap once. Keep moving after lifting.':'Drag anywhere to steer.'))));
-    return group;
+  function keyAim() {
+    if (!manual) return null;
+    const x = (keys.has('l') ? 1 : 0) - (keys.has('j') ? 1 : 0);
+    const y = (keys.has('k') ? 1 : 0) - (keys.has('i') ? 1 : 0);
+    return x || y ? { x, y } : null;
   }
   function frame(dt, now) {
     if (state !== 'play') return;
     // fixed small steps: game speed and fire cadence stay the same at 60, 30 or 15 fps
     for (const h of input.substeps(dt)) {
-      core.step(run, h, inputVec(h), null);
-      if (run.over || run.pending > 0 || run.milestone > 0) break;
+      core.step(run, h, inputVec(), input.aimVector(sticks, camView()) || keyAim());
+      if (run.over || run.pending > 0) break;
     }
     handleEvents(now);
     for (let i = fx.length - 1; i >= 0; i--) {
@@ -524,10 +486,8 @@ export function mount(root, ctx) {
       if (hurtTimer <= 0) wrap.classList.remove('hurt');
     }
     draw();
-    if(run.t-savedAt>=5){savedAt=run.t;save();}
-    time.set(mmss((run.duration - run.t) * 1000));
+    time.set(mmss((core.RUN_SECONDS - run.t) * 1000));
     level.set(run.level);
-    const equipped=['axes','orbit','storm','tome','nova'].filter(k=>run.up[k]);const stamp=equipped.map(k=>k+run.up[k]+run.evolutions.includes(k)).join();if(buildHud.dataset.stamp!==stamp){buildHud.dataset.stamp=stamp;fill(buildHud,h('span',null,'➶ Bow'),equipped.map(k=>h('span',{class:run.evolutions.includes(k)?'evolved':''},run.evolutions.includes(k)?`✦ ${core.EVOLUTIONS[k].name}`:`${core.UPGRADES[k].icon} ${core.UPGRADES[k].name} ${run.up[k]}`)));}
     kills.set(run.kills);
     hpFill.style.setProperty('width', Math.max(0, (run.hero.hp / run.hero.maxHp) * 100).toFixed(1) + '%');
     xpFill.style.setProperty('width', ((run.xp / core.xpNeeded(run.level)) * 100).toFixed(1) + '%');
@@ -535,23 +495,22 @@ export function mount(root, ctx) {
     else if (run.milestone > 0 || run.pending > 0) nextChoice();
   }
   // full frame rate while a finger is down, so aim and movement track the thumb; battery saver otherwise
-  const loop = createLoop(frame, () => (navigation.target || sticks.move ? 60 : ctx.fps()));
+  const loop = createLoop(frame, () => (sticks.aim || sticks.move ? 60 : ctx.fps()));
 
   // milestone rewards come first, then any normal level-up picks, then play resumes
   function nextChoice() {
     if (run.milestone > 0) chooseMilestone();
     else if (run.pending > 0) chooseUpgrade();
     else {
-      state = 'play'; ctx.playing(true);
+      state = 'play';
       loop.start();
     }
   }
   function chooseMilestone() {
-    state = 'choose'; ctx.playing(false);
+    state = 'choose';
     loop.stop();
     release();
     draw();
-    save();
     ctx.audio.good();
     haptic([20, 30, 20]);
     const ids = core.offerMilestones(run);
@@ -589,11 +548,10 @@ export function mount(root, ctx) {
     return h('p', { class: 'up-build' }, all.length ? ['Your build: ', all.join('  ·  ')] : 'No upgrades yet.');
   }
   function chooseUpgrade(choices) {
-    state = 'choose'; ctx.playing(false);
+    state = 'choose';
     loop.stop();
     release();
     draw();
-    save();
     const ids = choices || core.offerChoices(run);
     const card = (id) => {
       const heal = id === 'heal';
@@ -626,57 +584,44 @@ export function mount(root, ctx) {
 
   function start() {
     theme = activeTheme();
-    manual = false;
-    run.manual = false;
-    release();
-    if(!old){
-      run.heroClass=classIdx;
-      if(classIdx===0){run.up.power=1;run.up.rate=1;run.up.axes=1;}
-      if(classIdx===1){run.hero.maxHp=150;run.hero.hp=150;run.ms.shield=1;run.shieldCharges=1;run.up.orbit=1;}
-      if(classIdx===2){run.up.speed=1;run.up.magnet=1;run.up.storm=1;}
-      run.practice=!!ctx.practice;run.season=activeTheme().id;
-    }
-    manual=run.manual;
+    manual = store.pref('survivor', 'aim', 0) === 1;
+    run.manual = manual;
     updateView();
-    state = 'play'; ctx.playing(true);
+    state = 'play';
     sprites.clear();
     loop.start();
-    say(`${old?'Welcome back.':'Tap to move · Auto-fire is on.'} Leave marked danger circles.`, 2400);
-    save();
+    say(theme.tagline, 2600);
   }
   function end() {
     if (state === 'over') return;
-    state = 'over'; ctx.playing(false);
+    state = 'over';
     loop.stop();
     release();
     draw();
-    store.clearGame('survivor');
     const win = run.reason === 'dawn';
     ctx.finish({
       score: core.scoreOf(run),
       level: run.level,
       completed: win || run.t >= 60,
-      variant: `${run.duration}s_class${classIdx}_${manual?'manual':'auto'}_${theme.id}`,
       extra: [win ? 'You survived until dawn' : `You lasted ${mmss(run.t * 1000)}`, `Defeated: ${run.kills}`, `Theme: ${theme.name}`],
     });
   }
   function openPause() {
     if (state !== 'play' || pauseOv) return;
-    state = 'paused'; ctx.playing(false);
-    save();
+    state = 'paused';
     loop.stop();
     release();
     pauseOv = overlay(el, {
       title: 'Paused',
-      body: h('div', null, h('p', null, 'Weapons aim and fire automatically. Choose how you move.'), movementPicker(),buildLine()),
+      body: h('div', null, h('p', null, 'The horde is waiting.'), buildLine()),
       buttons: [
-        { label: 'Save & leave', onclick: () => {save();ctx.exit();} },
+        { label: 'Quit run', kind: 'danger', onclick: () => ctx.exit() },
         {
           label: 'Resume',
           kind: 'primary',
           onclick: () => {
             pauseOv = null;
-            state = 'play'; ctx.playing(true);
+            state = 'play';
             loop.start();
           },
         },
@@ -689,21 +634,34 @@ export function mount(root, ctx) {
     const r = canvas.getBoundingClientRect();
     return { id: e.pointerId, x: e.clientX - r.left, y: e.clientY - r.top, w: r.width, manual };
   };
-  canvas.addEventListener('pointerdown',e=>{
-    if(state!=='play'||(e.pointerType==='mouse'&&e.button!==0))return;
+  canvas.addEventListener('pointerdown', (e) => {
+    if (state !== 'play') return;
     e.preventDefault();
-    const took=moveStyle===0?input.navigateDown(navigation,local(e),camView()):input.pointerDown(sticks,{...local(e),manual:false});
-    if(took){try{canvas.setPointerCapture(e.pointerId);}catch{}draw();}
+    const took = input.pointerDown(sticks, local(e));
+    if (took === 'aim') {
+      // fire and draw right away instead of waiting for the next frame
+      core.step(run, 1 / 240, inputVec(), input.aimVector(sticks, camView()));
+      handleEvents(performance.now());
+      draw();
+    } else if (took) draw();
+    if (took) {
+      try {
+        canvas.setPointerCapture(e.pointerId);
+      } catch {
+        /* capture is best effort */
+      }
+    }
   });
-  canvas.addEventListener('pointermove',e=>{
-    if(state!=='play')return;
-    const evs=e.getCoalescedEvents?e.getCoalescedEvents():[],latest=local(evs.length?evs[evs.length-1]:e);
-    if(moveStyle===0)input.navigateMove(navigation,latest,camView());else input.pointerMove(sticks,latest);
+  canvas.addEventListener('pointermove', (e) => {
+    if (state !== 'play') return;
+    // use the newest sample the browser has, not a stale one
+    const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
+    input.pointerMove(sticks, local(evs.length ? evs[evs.length - 1] : e));
   });
-  canvas.addEventListener('pointerup',e=>{input.navigateUp(navigation,e.pointerId);input.pointerUp(sticks,e.pointerId);});
-  const cancelPointer=e=>{input.navigateUp(navigation,e.pointerId,{cancel:true});input.pointerUp(sticks,e.pointerId);};
-  canvas.addEventListener('pointercancel',cancelPointer);
-  canvas.addEventListener('lostpointercapture',cancelPointer);
+  const lift = (e) => input.pointerUp(sticks, e.pointerId);
+  canvas.addEventListener('pointerup', lift);
+  canvas.addEventListener('pointercancel', lift);
+  canvas.addEventListener('lostpointercapture', lift);
   const onHide = () => {
     release();
     if (document.hidden) openPause();
@@ -711,10 +669,8 @@ export function mount(root, ctx) {
   window.addEventListener('blur', release);
   document.addEventListener('visibilitychange', onHide);
   const onKey = (e) => {
-    if(state!=='play')return;
-    if(e.key===' '){e.preventDefault();release();return;}
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'a', 'd', 'w', 's'].includes(k)) {
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'a', 'd', 'w', 's', 'i', 'j', 'k', 'l'].includes(k)) {
       keys.add(k);
       if (state === 'play') e.preventDefault();
     }
@@ -747,29 +703,42 @@ export function mount(root, ctx) {
       paint();
     }
     const desc = h('p', { class: 'theme-desc' });
+    const ctl = h('div', { class: 'theme-chips two', role: 'radiogroup', 'aria-label': 'Aiming' });
+    const ctlDesc = h('p', { class: 'theme-desc' });
+    function paintCtl() {
+      const opts = [
+        ['Auto-aim', '🎯', 'Drag anywhere to move. Your hero shoots the nearest enemy on its own.'],
+        ['Manual aim', '🕹️', 'Left thumb moves. Touch and hold the right side: you fire at your finger for as long as you hold. Shots hit 35% harder.'],
+      ];
+      fill(
+        ctl,
+        opts.map(([n, ic], i) =>
+          h('button', { class: 'theme-chip' + (manual === (i === 1) ? ' on' : ''), type: 'button', role: 'radio', 'aria-checked': manual === (i === 1) ? 'true' : 'false', onclick: () => ((manual = i === 1), store.setPref('survivor', 'aim', i), paintCtl()) }, h('span', null, ic), h('small', null, n)),
+        ),
+      );
+      ctlDesc.textContent = opts[manual ? 1 : 0][2];
+    }
+    paintCtl();
     paint();
     overlay(el, {
       title: 'Holiday Horde',
       body: h(
         'div',
         { class: 'howto' },
-        h('p', null, 'Survive ten minutes. Move through the horde while your arsenal fires automatically. Collect experience crystals, stack weapons, and open elite chests to evolve them.'),
-        h('ul', null, h('li', null, 'Build six weapons at once: bow, crescent axes, orbit blades, lightning, ember pools, and shock pulses.'), h('li', null, 'Max a weapon and its matching passive, then collect a chest from an elite or boss to evolve it. Each upgrade lists its recipe.')),
-        h('strong',{class:'es-len-h'},'Choose your starting build'),
-        h('div',{class:'class-picker',role:'group','aria-label':'Hero class'},[['Ranger','Bow + crescent axes. Faster, stronger shots.'],['Warden','Bow + orbit blades. 150 health and a barrier.'],['Wayfinder','Bow + stormcall. Move and collect faster.']].map(([name,desc],i)=>h('button',{class:'class-card'+(classIdx===i?' on':''),type:'button','aria-pressed':String(classIdx===i),onclick:e=>{classIdx=i;store.setPref('survivor','heroClass',i);for(const b of e.currentTarget.parentElement.children){b.classList.toggle('on',b===e.currentTarget);b.setAttribute('aria-pressed',String(b===e.currentTarget));}}},name,h('small',null,desc)))),
-        movementPicker(),
-        h('p',{class:'theme-desc'},'Tap a destination to walk there. Tap again to redirect. Stop or Space cancels movement. Weapons fire automatically.'),
+        h('p', null, 'Survive four minutes. Dodge the horde, collect gems, and build your weapon. Choose how you aim below.'),
+        h('ul', null, h('li', null, 'Collect the gems that fall to level up, then pick an upgrade. Build toward a style: shooting, guarding or moving.'), h('li', null, 'Swarms and bosses arrive as time goes on. Keep moving.')),
+        ctl,
+        ctlDesc,
         chips,
         desc,
       ),
       buttons: [{ label: 'Start', kind: 'primary', onclick: start }],
     });
   }
-  if(old)overlay(el,{title:'Continue your expedition',body:h('p',null,`Level ${run.level}. Your build and enemies are saved.`),buttons:[{label:'Continue run',kind:'primary',onclick:()=>{start();nextChoice();}}]});else showReady();
+  showReady();
 
   return {
     destroy() {
-      if(state!=='ready'&&state!=='over')save();
       loop.destroy();
       ro.disconnect();
       clearTimeout(bannerTimer);
