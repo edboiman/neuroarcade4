@@ -103,18 +103,28 @@ self.addEventListener('fetch', (event) => {
       const cache = await caches.open(CACHE);
       const hit = await cache.match(req, { ignoreSearch: true });
       if (hit) return hit;
+      // Any page load inside the app's scope is the single-page app itself. Firefox (and home-screen
+      // shortcuts) can open URLs that don't exactly match './' — e.g. no trailing slash, '/index.html?x',
+      // or a stale path — so serve the cached shell for every navigation before touching the network.
+      if (req.mode === 'navigate') {
+        const shell = (await cache.match('./')) || (await cache.match('./index.html'));
+        if (shell) return shell;
+      }
       try {
         if (req.mode === 'navigate') await repair();
         else await cache.add(new Request(req.url, { cache: 'reload' }));
         const fresh = await cache.match(req, { ignoreSearch: true });
         if (fresh) return fresh;
         if (req.mode === 'navigate') {
-          const shell = (await cache.match('./')) || (await cache.match('index.html'));
+          const shell = (await cache.match('./')) || (await cache.match('./index.html'));
           if (shell) return shell;
         }
       } catch (e) {
         // offline and not cached: fall through
       }
+      // Last resort: an older version's cache may still hold the file (e.g. activate ran mid-update).
+      const any = await caches.match(req, { ignoreSearch: true });
+      if (any) return any;
       return new Response('Not available offline', { status: 404, headers: { 'Content-Type': 'text/plain' } });
     })(),
   );
