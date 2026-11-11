@@ -19,6 +19,7 @@ const ctxBase = {
   nav: { go, back: () => history.back() },
   updateReady: () => updateWaiting,
   applyUpdate,
+  offlineStatus,
 };
 
 // ---------- routing ----------
@@ -205,7 +206,8 @@ function showResults(g, result, durationSec) {
 async function registerSW() {
   if (!('serviceWorker' in navigator)) return;
   try {
-    swReg = await navigator.serviceWorker.register('sw.js');
+    swReg = await navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' });
+    await swReg.update().catch(() => {}); // look for a newer version on every start (no-op offline)
     const watch = (reg) => {
       if (reg.waiting && navigator.serviceWorker.controller) updateWaiting = true;
       reg.addEventListener('updatefound', () => {
@@ -223,6 +225,22 @@ async function registerSW() {
   } catch (err) {
     console.warn('Offline support unavailable', err);
   }
+}
+
+// Asks the offline worker to refill any missing files and report how many are stored.
+// Resolves to { have, total, version } or null if there is no worker yet.
+function offlineStatus() {
+  return new Promise((resolve) => {
+    const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
+    if (!sw) return resolve(null);
+    const ch = new MessageChannel();
+    const timer = setTimeout(() => resolve(null), 30000);
+    ch.port1.onmessage = (e) => {
+      clearTimeout(timer);
+      resolve(e.data);
+    };
+    sw.postMessage('CHECK_OFFLINE', [ch.port2]);
+  });
 }
 
 function applyUpdate() {
@@ -287,7 +305,7 @@ async function boot() {
   history.replaceState({ s: 'hub' }, '');
   await render('hub');
   weeklyIntro();
-  registerSW();
+  registerSW().then(() => offlineStatus());
   store.requestPersistence();
   store.onChange(applyBodyFlags);
 }

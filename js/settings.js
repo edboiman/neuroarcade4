@@ -4,6 +4,7 @@ import { VERSION } from './version.js';
 import { OVERDUE_DAYS } from './weekly.js';
 
 export function mountSettings(root, ctx) {
+  const offlineLine = h('p', { class: 'fine' }, 'Offline: checking…');
   const toggle = (key, title, desc) => {
     const sw = h('button', { class: 'switch', type: 'button', role: 'switch', 'aria-checked': String(!!store.settings()[key]), 'aria-label': title });
     sw.addEventListener('click', () => {
@@ -114,9 +115,15 @@ export function mountSettings(root, ctx) {
         h('h2', null, 'About'),
         h('p', { class: 'fine' }, 'Neuro Arcade is engaging mental exercise. Studies show training reliably improves the trained skill, while transfer to everyday thinking is modest and debated. It is not a medical treatment.'),
         h('p', { class: 'fine' }, 'Version ' + VERSION),
+        offlineLine,
       ),
     ),
   );
   root.append(el);
+  ctx.offlineStatus && ctx.offlineStatus().then((st) => {
+    if (!st) offlineLine.textContent = 'Offline: not set up yet. Open the app once with internet, then reload.';
+    else if (st.have === st.total) offlineLine.textContent = `Offline: ready (${st.total} files saved, version ${st.version}).`;
+    else offlineLine.textContent = `Offline: ${st.have} of ${st.total} files saved. Connect to the internet to finish.`;
+  });
   return { destroy() {} };
 }

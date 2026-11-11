@@ -11,6 +11,8 @@ for (const f of files) {
   hash.update(f);
   hash.update(readFileSync(join(root, f)));
 }
+// Include the worker's own code (minus its stamped lines) so a change to sw.js also renames the cache.
+hash.update(readFileSync(join(root, 'sw.js'), 'utf8').replace(/const VERSION = '[^']*';/, '').replace(/\/\*PRECACHE_START\*\/[\s\S]*?\/\*PRECACHE_END\*\//, ''));
 const version = hash.digest('hex').slice(0, 10);
 
 const list = ['./', ...files.map((f) => './' + f)].map((f) => `  '${f}'`).join(',\n');

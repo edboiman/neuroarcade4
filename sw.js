@@ -1,7 +1,7 @@
 // Offline cache. All files are stored at install time and served cache-first.
 // This worker never contacts any server except to download this app's own files once per update,
 // and it ignores every cross-origin request.
-const VERSION = 'd9bd2102f4';
+const VERSION = 'e3541c0c0e';
 const PREFIX = 'neuro-arcade-';
 const CACHE = PREFIX + VERSION;
 const PRECACHE = [
@@ -56,17 +56,49 @@ const PRECACHE = [
   /*PRECACHE_END*/
 ];
 
+const reqFor = (u) => new Request(u, { cache: 'reload' });
+
+// Download any listed file that is not in the cache yet, one by one, so a single failure cannot
+// leave the whole cache empty. Returns how many files are cached afterwards.
+let filling = null;
+function fillMissing() {
+  if (!filling) {
+    filling = (async () => {
+      const cache = await caches.open(CACHE);
+      let have = 0;
+      for (const u of PRECACHE) {
+        if (await cache.match(u)) {
+          have++;
+          continue;
+        }
+        try {
+          await cache.add(reqFor(u));
+          have++;
+        } catch (e) {
+          // offline or file missing on the server: try again next time
+        }
+      }
+      return have;
+    })().finally(() => {
+      filling = null;
+    });
+  }
+  return filling;
+}
+
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(PRECACHE.map((u) => new Request(u, { cache: 'reload' })))),
-  );
+  // All-or-nothing: a new version only installs once every file is stored.
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(PRECACHE.map(reqFor))));
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
-      for (const key of await caches.keys()) {
-        if (key.startsWith(PREFIX) && key !== CACHE) await caches.delete(key);
+      // Only drop old versions once this one is complete, so there is always a working copy.
+      if ((await fillMissing()) === PRECACHE.length) {
+        for (const key of await caches.keys()) {
+          if (key.startsWith(PREFIX) && key !== CACHE) await caches.delete(key);
+        }
       }
       await self.clients.claim();
     })(),
@@ -75,56 +107,77 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('message', (event) => {
   if (event.data === 'SKIP_WAITING') self.skipWaiting();
+  // The page asks on every start. Firefox's "clear cache" can empty the stored files while keeping
+  // this worker, so we refill anything missing and report how many of the files are ready offline.
+  if (event.data === 'CHECK_OFFLINE') {
+    const port = event.ports && event.ports[0];
+    event.waitUntil(
+      fillMissing().then((have) => {
+        if (port) port.postMessage({ have, total: PRECACHE.length, version: VERSION });
+      }),
+    );
+  }
 });
 
-// If the browser evicted our cache (Android does this to sites under storage pressure) the worker
-// would otherwise keep answering "not available" even online. On a miss we re-download the app's own
-// files (same origin only) and serve them; offline with nothing cached is the only real failure.
-let repairing = null;
-function repair() {
-  if (!repairing) {
-    repairing = caches
-      .open(CACHE)
-      .then((cache) => cache.addAll(PRECACHE.map((u) => new Request(u, { cache: 'reload' }))))
-      .finally(() => {
-        repairing = null;
-      });
-  }
-  return repairing;
+async function fromAnyCache(req) {
+  const own = await caches.open(CACHE);
+  const hit = await own.match(req, { ignoreSearch: true });
+  if (hit) return hit;
+  return caches.match(req, { ignoreSearch: true }); // an older complete version, if still stored
 }
+
+async function shell() {
+  const own = await caches.open(CACHE);
+  return (
+    (await own.match('./')) ||
+    (await own.match('./index.html')) ||
+    (await caches.match('./', { ignoreSearch: true })) ||
+    (await caches.match('./index.html', { ignoreSearch: true }))
+  );
+}
+
+const OFFLINE_PAGE =
+  '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+  '<title>Neuro Arcade</title><body style="background:#05060a;color:#eee;font:16px sans-serif;padding:24px">' +
+  '<h1>Not saved for offline yet</h1><p>This phone has no stored copy of Neuro Arcade (the browser may have cleared it). ' +
+  'Connect to the internet once and open the app; after that it works offline.</p>';
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
+  const scope = new URL(self.registration.scope);
+  if (!url.pathname.startsWith(scope.pathname.replace(/\/$/, ''))) return;
+
   event.respondWith(
     (async () => {
-      const cache = await caches.open(CACHE);
-      const hit = await cache.match(req, { ignoreSearch: true });
-      if (hit) return hit;
-      // Any page load inside the app's scope is the single-page app itself. Firefox (and home-screen
-      // shortcuts) can open URLs that don't exactly match './' — e.g. no trailing slash, '/index.html?x',
-      // or a stale path — so serve the cached shell for every navigation before touching the network.
       if (req.mode === 'navigate') {
-        const shell = (await cache.match('./')) || (await cache.match('./index.html'));
-        if (shell) return shell;
+        // Every page load inside the app is the app itself, whatever the exact address.
+        const page = await shell();
+        if (page) {
+          event.waitUntil(fillMissing());
+          return page;
+        }
+        try {
+          await fillMissing();
+          const fresh = await shell();
+          if (fresh) return fresh;
+        } catch (e) {
+          // fall through
+        }
+        return new Response(OFFLINE_PAGE, { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
       }
+      const hit = await fromAnyCache(req);
+      if (hit) return hit;
       try {
-        if (req.mode === 'navigate') await repair();
-        else await cache.add(new Request(req.url, { cache: 'reload' }));
+        const cache = await caches.open(CACHE);
+        await cache.add(reqFor(req.url));
         const fresh = await cache.match(req, { ignoreSearch: true });
         if (fresh) return fresh;
-        if (req.mode === 'navigate') {
-          const shell = (await cache.match('./')) || (await cache.match('./index.html'));
-          if (shell) return shell;
-        }
       } catch (e) {
-        // offline and not cached: fall through
+        // offline and not cached
       }
-      // Last resort: an older version's cache may still hold the file (e.g. activate ran mid-update).
-      const any = await caches.match(req, { ignoreSearch: true });
-      if (any) return any;
       return new Response('Not available offline', { status: 404, headers: { 'Content-Type': 'text/plain' } });
     })(),
   );
